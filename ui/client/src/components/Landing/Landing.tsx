@@ -14,6 +14,7 @@ import ChatWindow from '../ChatWindow';
 
 // Component Imports
 import PetForm from '../PetForm';
+import UploadFileComponent from '../UploadFileComponent';
 
 export default function LandingPage() {
   return (
@@ -30,12 +31,20 @@ export default function LandingPage() {
         <Tabs defaultSelectedIndex={0}>
           <TabList className='tabs-group' aria-label='Page navigation'>
             <Tab>Chat with your docs</Tab>
+            <Tab>Upload Docs to Vector DB</Tab>
           </TabList>
           <TabPanels>
             <TabPanel>
               <Grid className='tabs-group-content' fullWidth>
                 <Column sm={4} md={8} lg={16}>
                   <ChatWindow/>
+                </Column>
+              </Grid>
+            </TabPanel>
+            <TabPanel>
+              <Grid className='tabs-group-content' fullWidth>
+                <Column sm={4} md={8} lg={16}>
+                  <UploadFileComponent/>
                 </Column>
               </Grid>
             </TabPanel>
