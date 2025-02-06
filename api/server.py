@@ -13,9 +13,13 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from ibm_watsonx_ai.foundation_models import Embeddings
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
+from ibm_watsonx_ai.foundation_models import ModelInference
 from ibm_watsonx_ai import Credentials
 
 from langchain_ibm import WatsonxLLM
+
+
+from pydantic import BaseModel
 
 import tempfile
 import chromadb
@@ -265,7 +269,7 @@ async def process_documents_by_collection():
                     texts = [doc.page_content for doc in batch]
                     metadatas = [doc.metadata for doc in batch]
                     embeddings = embedding_model.embed_documents(
-                        texts=texts, concurrency_limit=10
+                        texts=texts, concurrency_limit=5
                     )
                     collection.add(
                         embeddings=embeddings,
@@ -402,8 +406,12 @@ async def search_all_documents(query: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class QueryRequest(BaseModel):
+    query: str
+
+
 @app.post("/rag-query")
-async def rag_query(query: str):
+async def rag_query(request: QueryRequest):
     try:
         apikey = os.environ.get("IBM_APIKEY")
         project_id = os.environ.get("PROJECT_ID")
@@ -418,29 +426,31 @@ async def rag_query(query: str):
             model_id="intfloat/multilingual-e5-large",
             credentials=credentials,
             project_id=project_id,
+            verify=True,
         )
 
         parameters = {
             "decoding_method": "greedy",
             "min_new_tokens": 1,
-            "max_new_tokens": 100,
+            "max_new_tokens": 300,
             "stop_sequences": ["<|endoftext|>"],
         }
 
-        watsonx_llm = WatsonxLLM(
+        model = ModelInference(
             model_id="ibm/granite-3-8b-instruct",
-            url=credentials["url"],
-            apikey=credentials["apikey"],
-            project_id=project_id,
+            credentials=credentials,
             params=parameters,
+            project_id=project_id,
         )
 
-        query_embedding = embedding_model.embed_query(query)
+        watsonx_llm = WatsonxLLM(watsonx_model=model)
+
+        query_embedding = embedding_model.embed_query(request.query)
 
         collection = chroma_client.get_collection("Coffee")
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=3, # 3 results seems like it gives good answers
+            n_results=2,  # 3 results seems like it gives good answers
             include=["documents", "metadatas", "distances"],
         )
 
@@ -452,7 +462,7 @@ async def rag_query(query: str):
             metadata["relevance_score"] = 1 - distance
             relevant_documents.append({"content": doc, "metadata": metadata})
 
-        # so this is where we grab the response from the vectordb, and add it to a 
+        # so this is where we grab the response from the vectordb, and add it to a
         # context var
         context = "\n\n".join(
             [f"Content:\n{doc['content']}" for doc in relevant_documents]
@@ -470,7 +480,7 @@ async def rag_query(query: str):
                 You are an assistant for question-answering tasks. Generate a conversational response for the given question based on the given set of document context. Think step by step to answer in a crisp manner. Answer should not be more than 200 words. If you do not find any relevant answer in the given documents, please state you do not have an answer. Do not try to generate any information.
 
                 Context : {context}
-                Question : {query}
+                Question : {request.query}
                 Answer: <|start_of_role|>assistant<|end_of_role|>"""
 
         response = watsonx_llm(prompt)
