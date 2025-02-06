@@ -11,3 +11,5 @@ build/
 # python stuff to ignore
 venv/
 __pycache__/
+
+chroma_db/

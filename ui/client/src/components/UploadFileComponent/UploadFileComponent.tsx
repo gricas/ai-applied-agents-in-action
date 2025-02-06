@@ -5,6 +5,7 @@ import {
   FileUploaderDropContainer,
   FileUploaderItem,
 } from '@carbon/react';
+import axios from 'axios';
 
 import { Upload, SubtractAlt } from '@carbon/icons-react';
 
@@ -14,15 +15,16 @@ interface UploadedFile {
   status: 'edit' | 'complete' | 'uploading';
   invalid?: boolean;
   errorMessage?: string;
+  file?: File;
 }
 
 interface DocumentUploaderProps {
-  maxFileSize?: number; // in bytes
+  maxFileSize?: number;
   onFilesSelected?: (files: File[]) => void;
 }
 
 const UploadFileComponent: React.FC<DocumentUploaderProps> = ({
-  maxFileSize = 5 * 1024 * 1024, // 5MB default
+  maxFileSize = 5 * 1024 * 1024,
   onFilesSelected,
 }) => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -76,6 +78,7 @@ const UploadFileComponent: React.FC<DocumentUploaderProps> = ({
         status: 'edit',
         invalid: !validation.valid,
         errorMessage: validation.error,
+        file: file,
       };
 
       if (validation.valid) {
@@ -105,6 +108,72 @@ const UploadFileComponent: React.FC<DocumentUploaderProps> = ({
 
   const handleDelete = (fileId: string) => {
     setUploadedFiles((prev) => prev.filter((file) => file.id !== fileId));
+  };
+
+  const handleSubmit = async () => {
+    // Filter out invalid files
+    const validFiles = uploadedFiles.filter(
+      (file) => !file.invalid && file.file,
+    );
+
+    if (validFiles.length === 0) {
+      console.error('No valid files to upload');
+      return;
+    }
+
+    // Create FormData instance
+    const formData = new FormData();
+
+    // Update UI to show uploading status
+    setUploadedFiles((prev) =>
+      prev.map((file) => ({
+        ...file,
+        status: !file.invalid ? 'uploading' : file.status,
+      })),
+    );
+
+    // Append all valid files to FormData
+    validFiles.forEach((fileData) => {
+      if (fileData.file) {
+        formData.append('files', fileData.file);
+      }
+    });
+
+    try {
+      const response = await axios.post('/api/uploadFile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 100),
+          );
+          console.log(`Upload Progress: ${percentCompleted}%`);
+        },
+      });
+
+      // Update UI to show completion status
+      setUploadedFiles((prev) =>
+        prev.map((file) => ({
+          ...file,
+          status: !file.invalid ? 'complete' : file.status,
+        })),
+      );
+
+      console.log('Upload successful:', response.data);
+    } catch (error) {
+      // Update UI to show error status
+      setUploadedFiles((prev) =>
+        prev.map((file) => ({
+          ...file,
+          status: 'edit',
+          invalid: true,
+          errorMessage: 'Upload failed. Please try again.',
+        })),
+      );
+
+      console.error('Upload failed:', error);
+    }
   };
 
   return (
@@ -139,7 +208,7 @@ const UploadFileComponent: React.FC<DocumentUploaderProps> = ({
           />
         ))}
       </div>
-      <ButtonSet stacked>
+      <ButtonSet stacked className='upload-file__button-set'>
         <Button
           kind='primary'
           renderIcon={Upload}

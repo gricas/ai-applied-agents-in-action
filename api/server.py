@@ -1,13 +1,22 @@
 import json
 import os
-from typing import Dict, Any
+from typing import Dict, List, Any
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, status, HTTPException, Body
+from fastapi import FastAPI, status, HTTPException, Body, UploadFile, File
 from langchain_core.output_parsers import StrOutputParser
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+from ibm_watsonx_ai.foundation_models import Embeddings
+from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
+from ibm_watsonx_ai import Credentials
+
+import tempfile
+import chromadb
 
 from routes.models import ModelRequest
 
@@ -17,7 +26,7 @@ from schemas import (
     PromptTemplateRequest,
     JSONResponseTemplate,
     GeneratePetNameResponse,
-    GenerateSummaryResponse
+    GenerateSummaryResponse,
 )
 
 # Set up basic logging
@@ -76,8 +85,7 @@ def load_prompt_templates():
             with open(file_path, "r") as f:
                 template = f.read()
             template_name = filename[:-4]
-            prompt_templates[template_name] = PromptTemplateRequest(
-                template=template)
+            prompt_templates[template_name] = PromptTemplateRequest(template=template)
 
 
 def load_examples():
@@ -90,8 +98,7 @@ def load_examples():
             with open(file_path, "r") as f:
                 template = f.read()
             template_name = filename[:-4]
-            examples_templates[template_name] = ExamplesTemplate(
-                template=template)
+            examples_templates[template_name] = ExamplesTemplate(template=template)
 
 
 # Initialize FastAPI app with custom lifespan
@@ -116,6 +123,163 @@ async def test_route(request: TestRequest):
         return {"data": data}
     except Exception as e:
         logging.error(f"Error in test_route: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+
+
+@app.post("/process-documents")
+async def process_documents(files: List[UploadFile] = File(...)):
+    try:
+
+        apikey = os.environ.get("IBM_APIKEY")
+        project_id = os.environ.get("PROJECT_ID")
+        url = os.environ.get("WATSON_URL")
+
+        credentials = Credentials(
+            url=url,
+            api_key=apikey,
+        )
+
+        embedding_model = Embeddings(
+            model_id="intfloat/multilingual-e5-large",
+            credentials=credentials,
+            project_id=project_id,
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            documents = []
+
+            for file in files:
+                file_path = os.path.join(temp_dir, file.filename)
+
+                with open(file_path, "wb") as buffer:
+                    content = await file.read()
+                    buffer.write(content)
+
+                if file.filename.endswith(".pdf"):
+                    loader = PyPDFLoader(file_path)
+                elif file.filename.endswith(".txt"):
+                    loader = TextLoader(file_path)
+                else:
+                    raise HTTPException(status_code=400, detail="Unsupported file type")
+
+                documents.extend(loader.load())
+
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=300,
+                chunk_overlap=100,
+                length_function=len,
+                is_separator_regex=False,
+            )
+            splits = text_splitter.split_documents(documents)
+
+            collection = chroma_client.get_or_create_collection(
+                name="document_collection", metadata={"hnsw:space": "cosine"}
+            )
+
+            batch_size = 100
+            for i in range(0, len(splits), batch_size):
+                batch = splits[i : i + batch_size]
+
+                texts = [doc.page_content for doc in batch]
+                metadatas = [doc.metadata for doc in batch]
+
+                embeddings = embedding_model.embed_documents(
+                    texts=texts,
+                    # params={
+                    #     EmbedTextParamsMetaNames.BATCH_SIZE: min(
+                    #         batch_size, len(batch))
+                    # }
+                )
+
+                collection.add(
+                    embeddings=embeddings,
+                    documents=texts,
+                    metadatas=metadatas,
+                    ids=[f"doc_{i}_{j}" for j in range(len(batch))],
+                )
+
+        return {"message": f"Successfully processed {len(files)} documents"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/list-collections")
+async def list_collections():
+    """
+    Route to list all collections in your chromadb.
+    """
+    try:
+        # Get collection names
+        collection_names = chroma_client.list_collections()
+
+        # Get details for each collection
+        collections_info = []
+        for name in collection_names:
+            collection = chroma_client.get_collection(name)
+            collections_info.append({"name": name, "count": collection.count()})
+
+        return {
+            "total_collections": len(collections_info),
+            "collections": collections_info,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/clear-db")
+async def clear_database():
+    """
+    Route to clear all collections from your chromadb.
+    """
+    try:
+        collection_names = chroma_client.list_collections()
+
+        for name in collection_names:
+            chroma_client.delete_collection(name=name)
+
+        return {"message": f"Successfully deleted {len(collection_names)} collections"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/search")
+async def search_documents(query: str):
+    """
+    Simple search.
+    """
+    try:
+        apikey = os.environ.get("IBM_APIKEY")
+        project_id = os.environ.get("PROJECT_ID")
+        url = os.environ.get("WATSON_URL")
+        credentials = Credentials(
+            url=url,
+            api_key=apikey,
+        )
+
+        embedding_model = Embeddings(
+            model_id="intfloat/multilingual-e5-large",
+            credentials=credentials,
+            project_id=project_id,
+        )
+
+        collection = chroma_client.get_collection(name="document_collection")
+
+        query_embedding = embedding_model.embed_documents(texts=[query])
+
+        results = collection.query(query_embeddings=query_embedding, n_results=1)
+
+        return {
+            "query": query,
+            "matches": {
+                "documents": results["documents"][0],
+                "distances": results["distances"][0],
+                "ids": results["ids"][0],
+            },
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -147,8 +311,11 @@ async def generate_pet_name(
     )
     return response
 
+
 async def generated_text_response(
-    template_model: str, prompt_template_name: str, prompt_template_kwargs: Dict[str, Any]
+    template_model: str,
+    prompt_template_name: str,
+    prompt_template_kwargs: Dict[str, Any],
 ) -> str:
     """
     Common functionality to generate a response using a specified model
@@ -201,8 +368,11 @@ async def generated_text_response(
         logging.error(f"Error in generate_response: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 async def generate_json_response(
-    template_model: str, prompt_template_name: str, prompt_template_kwargs: Dict[str, Any]
+    template_model: str,
+    prompt_template_name: str,
+    prompt_template_kwargs: Dict[str, Any],
 ) -> dict:
     """
     Generate a JSON response using a specified model and prompt template.
@@ -247,8 +417,7 @@ async def generate_json_response(
         prompt_template = PromptTemplate.from_template(
             template=prompt_template_request.template
         )
-        output_parser = PydanticOutputParser(
-            pydantic_object=JSONResponseTemplate)
+        output_parser = PydanticOutputParser(pydantic_object=JSONResponseTemplate)
         format_instructions = output_parser.get_format_instructions()
 
         prompt_template_kwargs["format_instructions"] = format_instructions

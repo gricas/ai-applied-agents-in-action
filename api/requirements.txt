@@ -19,8 +19,8 @@ httpx-sse==0.3.1
 ibm-cos-sdk==2.13.4
 ibm-cos-sdk-core==2.13.4
 ibm-cos-sdk-s3transfer==2.13.4
-ibm-generative-ai==2.1.1
-ibm_watsonx_ai==1.0.4
+ibm-generative-ai
+ibm_watsonx_ai
 idna==3.7
 importlib_metadata==7.1.0
 iniconfig==2.0.0
@@ -50,6 +50,7 @@ pytest==8.2.1
 pytest-asyncio==0.23.7
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
+python-multipart
 pytz==2024.1
 PyYAML==6.0.1
 requests==2.32.3

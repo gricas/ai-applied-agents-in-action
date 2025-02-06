@@ -13,7 +13,8 @@
   &__tile {
     min-height: 400px;
     max-height: 400px;
-    padding: 1.5rem;
+    padding-inline: 1.5rem;
+    padding-block: 1.5rem;
     border-radius: 8px;
     box-shadow: inset 0px 4px 10px rgba(0, 0, 0, 0.5);
     overflow-y: auto;
@@ -36,7 +37,7 @@
 
     &--agent {
       align-self: flex-start;
-      background-color: #f4f4f4;
+      background-color: rgba(222, 222, 222, 0.8);
       color: #000;
     }
 
