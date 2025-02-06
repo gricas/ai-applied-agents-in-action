@@ -3,7 +3,7 @@ import os
 
 
 def test_document_processing():
-    url = "http://localhost:8000/process_documents"
+    url = "http://localhost:8000/process-documents"
 
     txt_files = []
     for filename in os.listdir("docs"):

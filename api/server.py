@@ -15,6 +15,8 @@ from ibm_watsonx_ai.foundation_models import Embeddings
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
 from ibm_watsonx_ai import Credentials
 
+from langchain_ibm import WatsonxLLM
+
 import tempfile
 import chromadb
 
@@ -152,11 +154,11 @@ async def process_documents(files: List[UploadFile] = File(...)):
 
             for file in files:
                 file_path = os.path.join(temp_dir, file.filename)
-
+                file_name = os.path.splitext(file.filename)[0]
+                print(f"FILE NAME IS: {file_name}")
                 with open(file_path, "wb") as buffer:
                     content = await file.read()
                     buffer.write(content)
-
                 if file.filename.endswith(".pdf"):
                     loader = PyPDFLoader(file_path)
                 elif file.filename.endswith(".txt"):
@@ -167,8 +169,8 @@ async def process_documents(files: List[UploadFile] = File(...)):
                 documents.extend(loader.load())
 
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=300,
-                chunk_overlap=100,
+                chunk_size=1000,
+                chunk_overlap=500,
                 length_function=len,
                 is_separator_regex=False,
             )
@@ -187,6 +189,7 @@ async def process_documents(files: List[UploadFile] = File(...)):
 
                 embeddings = embedding_model.embed_documents(
                     texts=texts,
+                    concurrency_limit=10,
                     # params={
                     #     EmbedTextParamsMetaNames.BATCH_SIZE: min(
                     #         batch_size, len(batch))
@@ -202,6 +205,78 @@ async def process_documents(files: List[UploadFile] = File(...)):
 
         return {"message": f"Successfully processed {len(files)} documents"}
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/process-documents-by-collection")
+async def process_documents_by_collection():
+    txt_files = []
+    try:
+        apikey = os.environ.get("IBM_APIKEY")
+        project_id = os.environ.get("PROJECT_ID")
+        url = os.environ.get("WATSON_URL")
+        credentials = Credentials(
+            url=url,
+            api_key=apikey,
+        )
+        embedding_model = Embeddings(
+            model_id="intfloat/multilingual-e5-large",
+            credentials=credentials,
+            project_id=project_id,
+        )
+
+        for filename in os.listdir("docs"):
+            if filename.endswith(".txt"):
+                file_path = os.path.join("docs", filename)
+                with open(file_path, "rb") as f:
+                    content = f.read()
+                    txt_files.append(("files", (filename, content, "text/plain")))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for file_tuple in txt_files:
+                _, (filename, content, _) = file_tuple
+                file_path = os.path.join(temp_dir, filename)
+                file_name = os.path.splitext(filename)[0]
+
+                # Write content to temporary file
+                with open(file_path, "wb") as buffer:
+                    buffer.write(content)
+
+                # Only process txt files since that's all we're collecting
+                loader = TextLoader(file_path)
+
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=1000,
+                    chunk_overlap=500,
+                    length_function=len,
+                    is_separator_regex=False,
+                )
+                documents = loader.load()
+                splits = text_splitter.split_documents(documents)
+                collection = chroma_client.get_or_create_collection(
+                    name=file_name,
+                    metadata={"hnsw:space": "cosine"},
+                )
+
+                batch_size = 100
+                for i in range(0, len(splits), batch_size):
+                    batch = splits[i : i + batch_size]
+                    texts = [doc.page_content for doc in batch]
+                    metadatas = [doc.metadata for doc in batch]
+                    embeddings = embedding_model.embed_documents(
+                        texts=texts, concurrency_limit=10
+                    )
+                    collection.add(
+                        embeddings=embeddings,
+                        documents=texts,
+                        metadatas=metadatas,
+                        ids=[f"{file_name}_{i}_{j}" for j in range(len(batch))],
+                    )
+
+        return {
+            "message": f"Successfully processed {len(txt_files)} files into their respective collections"
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -248,7 +323,7 @@ async def clear_database():
 @app.get("/search")
 async def search_documents(query: str):
     """
-    Simple search.
+    Simple search against one collection.
     """
     try:
         apikey = os.environ.get("IBM_APIKEY")
@@ -269,7 +344,7 @@ async def search_documents(query: str):
 
         query_embedding = embedding_model.embed_documents(texts=[query])
 
-        results = collection.query(query_embeddings=query_embedding, n_results=1)
+        results = collection.query(query_embeddings=query_embedding, n_results=3)
 
         return {
             "query": query,
@@ -279,6 +354,138 @@ async def search_documents(query: str):
                 "ids": results["ids"][0],
             },
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/search-all")
+async def search_all_documents(query: str):
+    """
+    Search across all collections. Not best practice, but you know, just to
+    show a before and after agentic RAG.
+    """
+    try:
+        apikey = os.environ.get("IBM_APIKEY")
+        project_id = os.environ.get("PROJECT_ID")
+        url = os.environ.get("WATSON_URL")
+        credentials = Credentials(
+            url=url,
+            api_key=apikey,
+        )
+        embedding_model = Embeddings(
+            model_id="intfloat/multilingual-e5-large",
+            credentials=credentials,
+            project_id=project_id,
+        )
+
+        query_embedding = embedding_model.embed_documents(texts=[query])
+
+        collections = chroma_client.list_collections()
+
+        all_results = []
+        for collection_name in collections:
+            collection = chroma_client.get_collection(name=collection_name)
+            results = collection.query(query_embeddings=query_embedding, n_results=1)
+
+            result = {
+                "collection_name": collection_name,
+                "documents": results["documents"][0],
+                "distances": results["distances"][0],
+                "ids": results["ids"][0],
+            }
+            all_results.append(result)
+
+        sorted_results = sorted(all_results, key=lambda x: x["distances"][0])
+
+        return {"query": query, "matches": sorted_results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/rag-query")
+async def rag_query(query: str):
+    try:
+        apikey = os.environ.get("IBM_APIKEY")
+        project_id = os.environ.get("PROJECT_ID")
+        url = os.environ.get("WATSON_URL")
+
+        credentials = Credentials(
+            url=url,
+            api_key=apikey,
+        )
+
+        embedding_model = Embeddings(
+            model_id="intfloat/multilingual-e5-large",
+            credentials=credentials,
+            project_id=project_id,
+        )
+
+        parameters = {
+            "decoding_method": "greedy",
+            "min_new_tokens": 1,
+            "max_new_tokens": 100,
+            "stop_sequences": ["<|endoftext|>"],
+        }
+
+        watsonx_llm = WatsonxLLM(
+            model_id="ibm/granite-3-8b-instruct",
+            url=credentials["url"],
+            apikey=credentials["apikey"],
+            project_id=project_id,
+            params=parameters,
+        )
+
+        query_embedding = embedding_model.embed_query(query)
+
+        collection = chroma_client.get_collection("Coffee")
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=3, # 3 results seems like it gives good answers
+            include=["documents", "metadatas", "distances"],
+        )
+
+        relevant_documents = []
+        for doc, metadata, distance in zip(
+            results["documents"][0], results["metadatas"][0], results["distances"][0]
+        ):
+            metadata["collection"] = "Coffee"
+            metadata["relevance_score"] = 1 - distance
+            relevant_documents.append({"content": doc, "metadata": metadata})
+
+        # so this is where we grab the response from the vectordb, and add it to a 
+        # context var
+        context = "\n\n".join(
+            [f"Content:\n{doc['content']}" for doc in relevant_documents]
+        )
+
+        # got this prompt directly from IBM's internal RAG template
+        prompt = f"""<|start_of_role|>system<|end_of_role|>
+                - You are a helpful, respectful, and honest assistant that can summarize long documents.
+                - Always respond as helpfully as possible, while being safe.
+                - Your responses should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content.
+                - Please ensure that your responses are socially unbiased and positive in nature.
+                - If a document does not make any sense, or is not factually coherent, explain why instead of responding something not correct.
+                - If you don't know the response to a query, please do not share false information.
+                <|start_of_role|>user<|end_of_role|>
+                You are an assistant for question-answering tasks. Generate a conversational response for the given question based on the given set of document context. Think step by step to answer in a crisp manner. Answer should not be more than 200 words. If you do not find any relevant answer in the given documents, please state you do not have an answer. Do not try to generate any information.
+
+                Context : {context}
+                Question : {query}
+                Answer: <|start_of_role|>assistant<|end_of_role|>"""
+
+        response = watsonx_llm(prompt)
+
+        return {
+            "answer": response,
+            "sources": [
+                {
+                    "relevance_score": doc["metadata"]["relevance_score"],
+                    "metadata": doc["metadata"],
+                }
+                for doc in relevant_documents
+            ],
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
