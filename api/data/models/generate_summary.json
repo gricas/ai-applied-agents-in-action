@@ -1,5 +1,5 @@
 {
-  "id": "ibm/granite-20b-multilingual",
+  "id": "ibm/granite-3-8b-instruct",
   "parameters": {
     "decoding_method": "sample",
     "max_new_tokens": 200,
