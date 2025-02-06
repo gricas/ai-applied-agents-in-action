@@ -8,6 +8,7 @@ import {
   ButtonSet,
 } from '@carbon/react';
 import { Send, Reset } from '@carbon/icons-react';
+import axios from 'axios';
 
 export interface ChatMessage {
   id: string;
@@ -16,73 +17,19 @@ export interface ChatMessage {
   timestamp?: string;
 }
 
-const chatMessages: ChatMessage[] = [
+const openingMessage: ChatMessage[] = [
   {
     id: '1',
     sender: 'agent',
     message: 'Hello! How can I assist you today?',
-    timestamp: '2025-02-02T10:00:00Z',
-  },
-  {
-    id: '2',
-    sender: 'user',
-    message: 'Can you help me understand my recent transactions?',
-    timestamp: '2025-02-02T10:01:00Z',
-  },
-  {
-    id: '3',
-    sender: 'agent',
-    message: 'Sure! Could you please provide more details?',
-    timestamp: '2025-02-02T10:01:30Z',
-  },
-  {
-    id: '4',
-    sender: 'user',
-    message:
-      'I need information about the last three transactions on my account.',
-    timestamp: '2025-02-02T10:02:00Z',
-  },
-  {
-    id: '5',
-    sender: 'agent',
-    message: 'Here are the last three transactions:',
-    timestamp: '2025-02-02T10:02:30Z',
-  },
-  {
-    id: '6',
-    sender: 'agent',
-    message: '1. $200 at Grocery Store',
-    timestamp: '2025-02-02T10:02:35Z',
-  },
-  {
-    id: '7',
-    sender: 'agent',
-    message: '2. $50 at Gas Station',
-    timestamp: '2025-02-02T10:02:40Z',
-  },
-  {
-    id: '8',
-    sender: 'agent',
-    message: '3. $15 on Coffee',
-    timestamp: '2025-02-02T10:02:45Z',
-  },
-  {
-    id: '9',
-    sender: 'user',
-    message: 'Thanks! Can you tell me my current balance?',
-    timestamp: '2025-02-02T10:03:00Z',
-  },
-  {
-    id: '10',
-    sender: 'agent',
-    message: 'Your current balance is $3,245.67.',
-    timestamp: '2025-02-02T10:03:15Z',
+    timestamp: new Date().toISOString(),
   },
 ];
 
 const ChatWindow = () => {
   const [inputValue, setInputValue] = useState<string>('');
-  const [messages, setMessages] = useState<ChatMessage[]>(chatMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(openingMessage);
+  const [loading, setLoading] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -100,7 +47,7 @@ const ChatWindow = () => {
   };
 
   const handleReset = () => {
-    setMessages([]);
+    setMessages(openingMessage);
     setInputValue('');
   };
 
@@ -114,8 +61,32 @@ const ChatWindow = () => {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages([...messages, newMessage]);
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
     setInputValue('');
+    async function queryRaq() {
+      setLoading(true);
+      try {
+        const result = await axios.post('/api/query/', {
+          query: newMessage.message,
+        });
+        console.log(result.data.answer);
+
+        const newAnswer: ChatMessage = {
+          id: (updatedMessages.length + 1).toString(),
+          sender: 'agent',
+          message: result.data.answer,
+          timestamp: new Date().toISOString(),
+        };
+
+        setMessages([...updatedMessages, newAnswer]);
+      } catch (err) {
+        console.log(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    queryRaq();
   };
 
   const formatTimestamp = (timestamp?: string) => {
@@ -152,6 +123,15 @@ const ChatWindow = () => {
                 </span>
               </div>
             ))}
+            {loading && (
+              <div className='chat-window__loading'>
+                <span className='chat-window__loading-ellipsis'>
+                  <span>.</span>
+                  <span>.</span>
+                  <span>.</span>
+                </span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </Tile>
@@ -166,6 +146,7 @@ const ChatWindow = () => {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            disabled={loading}
           />
         </div>
         <ButtonSet className='chat-window__button-set'>
@@ -174,7 +155,7 @@ const ChatWindow = () => {
             renderIcon={Send}
             iconDescription='Send'
             onClick={handleSubmit}
-            disabled={inputValue.length === 0}
+            disabled={inputValue.length === 0 || loading}
             className='chat-window__button'
           >
             Send
@@ -185,6 +166,7 @@ const ChatWindow = () => {
             iconDescription='Reset'
             className='chat-window__button'
             onClick={handleReset}
+            disabled={loading}
           >
             Reset
           </Button>
