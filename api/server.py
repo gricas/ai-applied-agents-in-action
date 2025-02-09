@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import logging
 from contextlib import asynccontextmanager
 
@@ -13,10 +13,15 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from ibm_watsonx_ai.foundation_models import Embeddings
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
-from ibm_watsonx_ai.foundation_models import ModelInference
+from ibm_watsonx_ai.foundation_models import ModelInference, Model
 from ibm_watsonx_ai import Credentials
 
+
 from langchain_ibm import WatsonxLLM
+
+# from langchain.llms.base import LLM
+from crewai import Agent, Task, Crew, Process, LLM
+from langchain.tools import tool
 
 
 from pydantic import BaseModel
@@ -33,6 +38,7 @@ from schemas import (
     JSONResponseTemplate,
     GeneratePetNameResponse,
     GenerateSummaryResponse,
+    ClasificationResponse
 )
 
 # Set up basic logging
@@ -500,6 +506,124 @@ async def rag_query(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/agentic-route")
+async def agentic_route(query: QueryRequest):
+    try:
+        apikey = os.environ.get("IBM_APIKEY")
+        project_id = os.environ.get("PROJECT_ID")
+        url = os.environ.get("WATSON_URL")
+
+        llm = LLM(
+            # model='watsonx/mistralai/mistral-large',
+            model="watsonx/ibm/granite-3-8b-instruct",
+            base_url=url,
+            project_id=project_id,
+            max_tokens=50,
+            temperature=0.7,
+            api_key=apikey,
+        )
+
+        collection_selector_agent = Agent(
+            role="Collection Selector",
+            goal="Analyze user queries and determine the most relevant ChromaDB collection.",
+            backstory="Expert in query classification. Routes questions to the correct domain.",
+            verbose=True,
+            allow_delegation=False,
+            llm=llm,
+        )
+
+
+        debug_agent = Agent(
+            role="Debugging Agent",
+            goal="Prints the received output from the categorization task.",
+            backstory="An assistant designed to debug CrewAI task output flow.",
+            verbose=True,
+            allow_delegation=False,
+            llm=llm,
+        )
+
+        categorization_task = Task(
+            description=f"""
+            Based on the user query below, determine the best category.
+            You must return ONLY one of these exact values: "Coffee", "Baseball", or "Dogs".
+            IMPORTANT: You must respond with EXACTLY ONE WORD from this list:
+            Coffee
+            Baseball
+            Dogs
+
+            DO NOT include any other text, punctuation, or explanation.
+            DO NOT wrap the word in quotes or slashes.
+            INCORRECT examples:
+            - "/Dogs/"
+            - "I think Baseball"
+            - "The category is Coffee"
+
+            User Query: "{query.query}"
+            """,
+            expected_output="Either 'Coffee', 'Baseball', or 'Dogs'.",
+            agent=collection_selector_agent,
+            # may need to use this to ensure correct response
+            # output_pydantic=CategoryResponse
+        )
+
+        debugging_task = Task(
+            description="""
+            Print the received category from the categorization task to verify output passing.
+            
+            Expected Output:
+            - The category received from the first task.
+            """,
+            expected_output="The printed category from categorization_task.",
+            agent=debug_agent,
+            context=[categorization_task],
+        )
+
+        crew = Crew(
+            agents=[collection_selector_agent],
+            tasks=[categorization_task],
+            process=Process.sequential,
+            verbose=True,
+        )
+
+        crew_result = crew.kickoff()
+        return {"category": crew_result}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+        #         # models_available = {
+        #         #     "models_available": [
+        #         #         "codellama/codellama-34b-instruct-hf",
+        #         #         "google/flan-t5-xl",
+        #         #         "google/flan-t5-xxl",
+        #         #         "google/flan-ul2",
+        #         #         "ibm/granite-13b-instruct-v2",
+        #         #         "ibm/granite-20b-code-instruct",
+        #         #         "ibm/granite-20b-multilingual",
+        #         #         "ibm/granite-3-2-8b-instruct-preview-rc",
+        #         #         "ibm/granite-3-2b-instruct",
+        #         #         "ibm/granite-3-8b-instruct",
+        #         #         "ibm/granite-34b-code-instruct",
+        #         #         "ibm/granite-3b-code-instruct",
+        #         #         "ibm/granite-8b-code-instruct",
+        #         #         "ibm/granite-guardian-3-2b",
+        #         #         "ibm/granite-guardian-3-8b",
+        #         #         "meta-llama/llama-2-13b-chat",
+        #         #         "meta-llama/llama-3-1-70b-instruct",
+        #         #         "meta-llama/llama-3-1-8b-instruct",
+        #         #         "meta-llama/llama-3-2-11b-vision-instruct",
+        #         #         "meta-llama/llama-3-2-1b-instruct",
+        #         #         "meta-llama/llama-3-2-3b-instruct",
+        #         #         "meta-llama/llama-3-2-90b-vision-instruct",
+        #         #         "meta-llama/llama-3-3-70b-instruct",
+        #         #         "meta-llama/llama-3-405b-instruct",
+        #         #         "meta-llama/llama-guard-3-11b-vision",
+        #         #         "mistralai/mistral-large",
+        #         #         "mistralai/mixtral-8x7b-instruct-v01",
+        #         #     ]
+        #         # }
 @app.post("/generate_summary", response_model=GenerateSummaryResponse)
 async def generate_summary(
     template_model: str = Body(default="generate_summary"),
@@ -648,3 +772,147 @@ async def generate_json_response(
     except Exception as e:
         logging.error(f"Error in generate_response: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# @app.post("/agentic-route")
+# async def agentic_route(query: QueryRequest):
+#     try:
+#         apikey = os.environ.get("IBM_APIKEY")
+#         project_id = os.environ.get("PROJECT_ID")
+#         url = os.environ.get("WATSON_URL")
+
+#         # credentials = Credentials(
+#         #     url=url,
+#         #     api_key=apikey,
+#         # )
+#         # model_id = "ibm/granite-3-2b-instruct"
+#         # parameters = {
+#         #     "decoding_method": "sample",
+#         #     "max_new_tokens": 500,
+#         #     "temperature": 0.7,
+#         #     "top_k": 50,
+#         #     "top_p": 1,
+#         #     "repetition_penalty": 1,
+#         # }
+#         # credentials = Credentials(url=url, api_key=apikey)
+#         # ibm_model = Model(
+#         #     model_id=model_id,
+#         #     params=parameters,
+#         #     credentials=credentials,
+#         #     project_id=project_id,
+#         # )
+
+#         # class IBMWatsonLLM(LLM):
+#         #     def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+#         #         return ibm_model.generate_text(prompt=prompt, guardrails=False)
+
+#         #     @property
+#         #     def _llm_type(self) -> str:
+#         #         return "ibm_watson"
+
+#         #     def generate_text(self, prompt):
+#         #         return self._call(prompt)
+
+#         # llm = IBMWatsonLLM()
+#         # models_available = {
+#         #     "models_available": [
+#         #         "codellama/codellama-34b-instruct-hf",
+#         #         "google/flan-t5-xl",
+#         #         "google/flan-t5-xxl",
+#         #         "google/flan-ul2",
+#         #         "ibm/granite-13b-instruct-v2",
+#         #         "ibm/granite-20b-code-instruct",
+#         #         "ibm/granite-20b-multilingual",
+#         #         "ibm/granite-3-2-8b-instruct-preview-rc",
+#         #         "ibm/granite-3-2b-instruct",
+#         #         "ibm/granite-3-8b-instruct",
+#         #         "ibm/granite-34b-code-instruct",
+#         #         "ibm/granite-3b-code-instruct",
+#         #         "ibm/granite-8b-code-instruct",
+#         #         "ibm/granite-guardian-3-2b",
+#         #         "ibm/granite-guardian-3-8b",
+#         #         "meta-llama/llama-2-13b-chat",
+#         #         "meta-llama/llama-3-1-70b-instruct",
+#         #         "meta-llama/llama-3-1-8b-instruct",
+#         #         "meta-llama/llama-3-2-11b-vision-instruct",
+#         #         "meta-llama/llama-3-2-1b-instruct",
+#         #         "meta-llama/llama-3-2-3b-instruct",
+#         #         "meta-llama/llama-3-2-90b-vision-instruct",
+#         #         "meta-llama/llama-3-3-70b-instruct",
+#         #         "meta-llama/llama-3-405b-instruct",
+#         #         "meta-llama/llama-guard-3-11b-vision",
+#         #         "mistralai/mistral-large",
+#         #         "mistralai/mixtral-8x7b-instruct-v01",
+#         #     ]
+#         # }
+
+#         llm = LLM(
+#             # model='watsonx/mistralai/mistral-large',
+#             model='watsonx/ibm/granite-3-2b-instruct',
+#             base_url=url,
+#             project_id=project_id,
+#             max_tokens=50,
+#             temperature=0.7,
+#             api_key=apikey
+#         )
+
+
+#         # Agent = Agent(
+#         # role="{topic} specialist",
+#         # goal="Figure {goal} out",
+#         # backstory="I am the master of {role}",
+#         # system_template="""<|start_header_id|>system<|end_header_id|>
+
+#         # {{ .System }}<|eot_id|>""",
+#         # prompt_template="""<|start_header_id|>user<|end_header_id|>
+
+#         # {{ .Prompt }}<|eot_id|>""",
+#         # response_template="""<|start_header_id|>assistant<|end_header_id|>
+
+#         # {{ .Response }}<|eot_id|>""",
+#         # )
+
+#         collection_selector_agent = Agent(
+#             role="Collection Selector",
+#             goal="Analyze user queries and determine the most relevant ChromaDB collection.",
+#             backstory="Expert in query classification. Routes questions to the correct domain.",
+#             verbose=True,
+#             allow_delegation=False,
+#             llm=llm,
+#         )
+
+#         # categorization_task = Task(
+#         #     description=f"""
+#         #     Based on the user query below, determine the best category.
+#         #     You must return ONLY one of these exact values: "Coffee", "Baseball", or "Jack_Russell_Terrier".
+#         #     If the query is unclear, choose the best match.
+
+#         #     User Query: "{query.query}"
+#         #     """,
+#         #     expected_output="Either 'Coffee', 'Baseball', or 'Jack_Russell_Terrier'.",
+#         #     agent=collection_selector_agent,
+#         # )
+
+#         categorization_task = Task(
+#             description=f"""
+#             Based on the user query below, determine the best category.
+#             You must return ONLY one of these exact values: "Coffee", "Baseball", or "Jack_Russell_Terrier".
+#             If the query is unclear, choose the best match.
+
+#             User Query: "{query.query}"
+#             """,
+#             expected_output="Either 'Coffee', 'Baseball', or 'Jack_Russell_Terrier'.",
+#             agent=collection_selector_agent,
+#         )
+
+#         crew = Crew(
+#             agents=[collection_selector_agent],
+#             tasks=[categorization_task],
+#             verbose=True,
+#         )
+
+#         crew_result = crew.kickoff()
+#         return {"category": crew_result}
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
