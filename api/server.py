@@ -21,6 +21,7 @@ from langchain_ibm import WatsonxLLM
 
 # from langchain.llms.base import LLM
 from crewai import Agent, Task, Crew, Process, LLM
+from langchain.tools import tool
 
 
 from pydantic import BaseModel
@@ -512,39 +513,6 @@ async def agentic_route(query: QueryRequest):
         project_id = os.environ.get("PROJECT_ID")
         url = os.environ.get("WATSON_URL")
 
-
-#         # models_available = {
-#         #     "models_available": [
-#         #         "codellama/codellama-34b-instruct-hf",
-#         #         "google/flan-t5-xl",
-#         #         "google/flan-t5-xxl",
-#         #         "google/flan-ul2",
-#         #         "ibm/granite-13b-instruct-v2",
-#         #         "ibm/granite-20b-code-instruct",
-#         #         "ibm/granite-20b-multilingual",
-#         #         "ibm/granite-3-2-8b-instruct-preview-rc",
-#         #         "ibm/granite-3-2b-instruct",
-#         #         "ibm/granite-3-8b-instruct",
-#         #         "ibm/granite-34b-code-instruct",
-#         #         "ibm/granite-3b-code-instruct",
-#         #         "ibm/granite-8b-code-instruct",
-#         #         "ibm/granite-guardian-3-2b",
-#         #         "ibm/granite-guardian-3-8b",
-#         #         "meta-llama/llama-2-13b-chat",
-#         #         "meta-llama/llama-3-1-70b-instruct",
-#         #         "meta-llama/llama-3-1-8b-instruct",
-#         #         "meta-llama/llama-3-2-11b-vision-instruct",
-#         #         "meta-llama/llama-3-2-1b-instruct",
-#         #         "meta-llama/llama-3-2-3b-instruct",
-#         #         "meta-llama/llama-3-2-90b-vision-instruct",
-#         #         "meta-llama/llama-3-3-70b-instruct",
-#         #         "meta-llama/llama-3-405b-instruct",
-#         #         "meta-llama/llama-guard-3-11b-vision",
-#         #         "mistralai/mistral-large",
-#         #         "mistralai/mixtral-8x7b-instruct-v01",
-#         #     ]
-#         # }
-
         llm = LLM(
             # model='watsonx/mistralai/mistral-large',
             model="watsonx/ibm/granite-3-8b-instruct",
@@ -564,23 +532,56 @@ async def agentic_route(query: QueryRequest):
             llm=llm,
         )
 
+
+        debug_agent = Agent(
+            role="Debugging Agent",
+            goal="Prints the received output from the categorization task.",
+            backstory="An assistant designed to debug CrewAI task output flow.",
+            verbose=True,
+            allow_delegation=False,
+            llm=llm,
+        )
+
         categorization_task = Task(
             description=f"""
             Based on the user query below, determine the best category.
             You must return ONLY one of these exact values: "Coffee", "Baseball", or "Dogs".
-            If the query is unclear, choose the best match.
+            IMPORTANT: You must respond with EXACTLY ONE WORD from this list:
+            Coffee
+            Baseball
+            Dogs
+
+            DO NOT include any other text, punctuation, or explanation.
+            DO NOT wrap the word in quotes or slashes.
+            INCORRECT examples:
+            - "/Dogs/"
+            - "I think Baseball"
+            - "The category is Coffee"
 
             User Query: "{query.query}"
             """,
             expected_output="Either 'Coffee', 'Baseball', or 'Dogs'.",
             agent=collection_selector_agent,
             # may need to use this to ensure correct response
-            # output_pydantic=ClasificationResponse
+            # output_pydantic=CategoryResponse
+        )
+
+        debugging_task = Task(
+            description="""
+            Print the received category from the categorization task to verify output passing.
+            
+            Expected Output:
+            - The category received from the first task.
+            """,
+            expected_output="The printed category from categorization_task.",
+            agent=debug_agent,
+            context=[categorization_task],
         )
 
         crew = Crew(
             agents=[collection_selector_agent],
             tasks=[categorization_task],
+            process=Process.sequential,
             verbose=True,
         )
 
@@ -591,6 +592,38 @@ async def agentic_route(query: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+        #         # models_available = {
+        #         #     "models_available": [
+        #         #         "codellama/codellama-34b-instruct-hf",
+        #         #         "google/flan-t5-xl",
+        #         #         "google/flan-t5-xxl",
+        #         #         "google/flan-ul2",
+        #         #         "ibm/granite-13b-instruct-v2",
+        #         #         "ibm/granite-20b-code-instruct",
+        #         #         "ibm/granite-20b-multilingual",
+        #         #         "ibm/granite-3-2-8b-instruct-preview-rc",
+        #         #         "ibm/granite-3-2b-instruct",
+        #         #         "ibm/granite-3-8b-instruct",
+        #         #         "ibm/granite-34b-code-instruct",
+        #         #         "ibm/granite-3b-code-instruct",
+        #         #         "ibm/granite-8b-code-instruct",
+        #         #         "ibm/granite-guardian-3-2b",
+        #         #         "ibm/granite-guardian-3-8b",
+        #         #         "meta-llama/llama-2-13b-chat",
+        #         #         "meta-llama/llama-3-1-70b-instruct",
+        #         #         "meta-llama/llama-3-1-8b-instruct",
+        #         #         "meta-llama/llama-3-2-11b-vision-instruct",
+        #         #         "meta-llama/llama-3-2-1b-instruct",
+        #         #         "meta-llama/llama-3-2-3b-instruct",
+        #         #         "meta-llama/llama-3-2-90b-vision-instruct",
+        #         #         "meta-llama/llama-3-3-70b-instruct",
+        #         #         "meta-llama/llama-3-405b-instruct",
+        #         #         "meta-llama/llama-guard-3-11b-vision",
+        #         #         "mistralai/mistral-large",
+        #         #         "mistralai/mixtral-8x7b-instruct-v01",
+        #         #     ]
+        #         # }
 @app.post("/generate_summary", response_model=GenerateSummaryResponse)
 async def generate_summary(
     template_model: str = Body(default="generate_summary"),
