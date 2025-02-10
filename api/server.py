@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import logging
 from contextlib import asynccontextmanager
 
@@ -38,7 +38,7 @@ from schemas import (
     JSONResponseTemplate,
     GeneratePetNameResponse,
     GenerateSummaryResponse,
-    ClasificationResponse
+    ClasificationResponse,
 )
 
 # Set up basic logging
@@ -179,8 +179,8 @@ async def process_documents(files: List[UploadFile] = File(...)):
                 documents.extend(loader.load())
 
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=500,
+                chunk_size=800,
+                chunk_overlap=100,
                 length_function=len,
                 is_separator_regex=False,
             )
@@ -249,24 +249,27 @@ async def process_documents_by_collection():
                 file_path = os.path.join(temp_dir, filename)
                 file_name = os.path.splitext(filename)[0]
 
-                # Write content to temporary file
                 with open(file_path, "wb") as buffer:
                     buffer.write(content)
 
-                # Only process txt files since that's all we're collecting
                 loader = TextLoader(file_path)
 
                 text_splitter = RecursiveCharacterTextSplitter(
-                    chunk_size=1000,
-                    chunk_overlap=500,
+                    chunk_size=800,
+                    chunk_overlap=100,
                     length_function=len,
+                    separators=["\n\n", "\n", " "],
                     is_separator_regex=False,
                 )
                 documents = loader.load()
                 splits = text_splitter.split_documents(documents)
                 collection = chroma_client.get_or_create_collection(
-                    name=file_name,
-                    metadata={"hnsw:space": "cosine"},
+                    name=file_name.lower(),
+                    metadata={
+                        "hnsw:space": "cosine",
+                        "hnsw:construction_ef": 400,
+                        "hnsw:M": 128,
+                    },
                 )
 
                 batch_size = 100
@@ -297,10 +300,8 @@ async def list_collections():
     Route to list all collections in your chromadb.
     """
     try:
-        # Get collection names
         collection_names = chroma_client.list_collections()
 
-        # Get details for each collection
         collections_info = []
         for name in collection_names:
             collection = chroma_client.get_collection(name)
@@ -416,6 +417,11 @@ class QueryRequest(BaseModel):
     query: str
 
 
+class CategoryResponse(BaseModel):
+    query: str
+    category: str
+
+
 @app.post("/rag-query")
 async def rag_query(request: QueryRequest):
     try:
@@ -453,7 +459,7 @@ async def rag_query(request: QueryRequest):
 
         query_embedding = embedding_model.embed_query(request.query)
 
-        collection = chroma_client.get_collection("Coffee")
+        collection = chroma_client.get_collection("coffee")
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=2,  # 3 results seems like it gives good answers
@@ -464,7 +470,7 @@ async def rag_query(request: QueryRequest):
         for doc, metadata, distance in zip(
             results["documents"][0], results["metadatas"][0], results["distances"][0]
         ):
-            metadata["collection"] = "Coffee"
+            metadata["collection"] = "coffee"
             metadata["relevance_score"] = 1 - distance
             relevant_documents.append({"content": doc, "metadata": metadata})
 
@@ -513,12 +519,30 @@ async def agentic_route(query: QueryRequest):
         project_id = os.environ.get("PROJECT_ID")
         url = os.environ.get("WATSON_URL")
 
-        llm = LLM(
-            # model='watsonx/mistralai/mistral-large',
+        categorization_llm = LLM(
             model="watsonx/ibm/granite-3-8b-instruct",
             base_url=url,
             project_id=project_id,
             max_tokens=50,
+            temperature=0.7,
+            api_key=apikey,
+        )
+
+        retrieval_llm = LLM(
+            model="watsonx/ibm/granite-3-8b-instruct",
+            base_url=url,
+            project_id=project_id,
+            max_tokens=1000,
+            temperature=0.7,
+            api_key=apikey,
+        )
+
+        generation_llm = LLM(
+            model="watsonx/ibm/granite-3-8b-instruct",
+            # model="watsonx/mistralai/mistral-large",
+            base_url=url,
+            project_id=project_id,
+            max_tokens=3000,
             temperature=0.7,
             api_key=apikey,
         )
@@ -529,101 +553,253 @@ async def agentic_route(query: QueryRequest):
             backstory="Expert in query classification. Routes questions to the correct domain.",
             verbose=True,
             allow_delegation=False,
-            llm=llm,
-        )
-
-
-        debug_agent = Agent(
-            role="Debugging Agent",
-            goal="Prints the received output from the categorization task.",
-            backstory="An assistant designed to debug CrewAI task output flow.",
-            verbose=True,
-            allow_delegation=False,
-            llm=llm,
+            max_iter=3,
+            llm=categorization_llm,
         )
 
         categorization_task = Task(
             description=f"""
             Based on the user query below, determine the best category.
-            You must return ONLY one of these exact values: "Coffee", "Baseball", or "Dogs".
-            IMPORTANT: You must respond with EXACTLY ONE WORD from this list:
-            Coffee
-            Baseball
-            Dogs
-
-            DO NOT include any other text, punctuation, or explanation.
-            DO NOT wrap the word in quotes or slashes.
-            INCORRECT examples:
-            - "/Dogs/"
-            - "I think Baseball"
-            - "The category is Coffee"
-
+            You must return ONLY one of these exact values: "technical", "billing", or "account".
+            
+            Category Definitions:
+            - technical: Issues with system access, errors, API integration
+            - billing: Questions about pricing, payments, invoices
+            - account: User management, roles, organization settings
+            
+            IMPORTANT: Respond with EXACTLY ONE WORD from the list above.
+            
             User Query: "{query.query}"
             """,
-            expected_output="Either 'Coffee', 'Baseball', or 'Dogs'.",
+            expected_output="Either 'technical', 'billing', or 'account'",
             agent=collection_selector_agent,
             # may need to use this to ensure correct response
             # output_pydantic=CategoryResponse
         )
 
-        debugging_task = Task(
-            description="""
-            Print the received category from the categorization task to verify output passing.
-            
-            Expected Output:
-            - The category received from the first task.
-            """,
-            expected_output="The printed category from categorization_task.",
-            agent=debug_agent,
+        # Original categories, dogs, coffee, and baseball. My dataset stinks
+        # so maybe just generate synth data for something else...
+
+        # categorization_task = Task(
+        #     description=f"""
+        #     Based on the user query below, determine the best category.
+        #     You must return ONLY one of these exact values: "coffee", "baseball", or "dogs".
+        #     IMPORTANT: You must respond with EXACTLY ONE WORD from this list:
+        #     Coffee
+        #     Baseball
+        #     Dogs
+
+        #     DO NOT include any other text, punctuation, or explanation.
+        #     DO NOT wrap the word in quotes or slashes.
+        #     INCORRECT examples:
+        #     - "/dogs/"
+        #     - "I think baseball"
+        #     - "The category is coffee"
+
+        #     User Query: "{query.query}"
+        #     """,
+        #     expected_output="Either 'coffee', 'baseball', or 'dogs'.",
+        #     agent=collection_selector_agent,
+        #     # may need to use this to ensure correct response
+        #     # output_pydantic=CategoryResponse
+        # )
+
+        # @tool("query_collection_tool")
+        # def query_collection_tool(category: str, query: str) -> dict:
+        #     """Tool to query ChromaDB based on category and return relevant documents"""
+
+        #     credentials = Credentials(
+        #         url=url,
+        #         api_key=apikey,
+        #     )
+
+        #     embedding_model = Embeddings(
+        #         model_id="intfloat/multilingual-e5-large",
+        #         credentials=credentials,
+        #         project_id=project_id,
+        #         verify=True,
+        #     )
+
+        #     query_embedding = embedding_model.embed_query(query)
+        #     collection = chroma_client.get_collection(category.lower())
+        #     results = collection.query(
+        #         query_embeddings=[query_embedding],
+        #         n_results=5,
+        #         include=["documents", "metadatas", "distances"],
+        #     )
+
+        #     relevant_documents = []
+        #     for doc, metadata, distance in zip(
+        #         results["documents"][0],
+        #         results["metadatas"][0],
+        #         results["distances"][0],
+        #     ):
+        #         metadata["collection"] = category.lower()
+        #         metadata["relevance_score"] = 1 - distance
+        #         relevant_documents.append({"content": doc, "metadata": metadata})
+
+        #     context = "\n\n".join(
+        #         [f"Content:\n{doc['content']}" for doc in relevant_documents]
+        #     )
+
+        #     return {"category": category, "query": query, "context": context}
+
+        @tool("query_collection_tool")
+        def query_collection_tool(category: str, query: str) -> dict:
+            """Tool to query ChromaDB based on category and return relevant documents"""
+
+            credentials = Credentials(
+                url=url,
+                api_key=apikey,
+            )
+
+            embedding_model = Embeddings(
+                model_id="intfloat/multilingual-e5-large",
+                credentials=credentials,
+                project_id=project_id,
+                verify=True,
+            )
+
+            query_embedding = embedding_model.embed_query(query)
+            collection = chroma_client.get_collection(category.lower())
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=5,
+                include=["documents", "metadatas", "distances"],
+            )
+
+            relevant_documents = []
+            for doc, metadata, distance in zip(
+                results["documents"][0],
+                results["metadatas"][0],
+                results["distances"][0],
+            ):
+                similarity = 1 - distance
+                if similarity > 0.8:  # should adjust? maybe?
+                    metadata["collection"] = category.lower()
+                    metadata["relevance_score"] = similarity
+                    relevant_documents.append({"content": doc, "metadata": metadata})
+
+            relevant_documents.sort(
+                key=lambda x: x["metadata"]["relevance_score"], reverse=True
+            )
+            # lets see if 5 is enough
+            relevant_documents = relevant_documents[:5]
+
+            context = ""
+            for doc in relevant_documents:
+                score = doc["metadata"]["relevance_score"]
+                content = doc["content"]
+                context += f"\nRelevance Score: {score:.2f}\n{content}\n---\n"
+
+            return {"category": category, "query": query, "context": context}
+
+        retriever_agent = Agent(
+            role="Category Retriever",
+            goal="Query ChromaDB with the appropriate category and return results",
+            backstory=(
+                "You are responsible for taking the classified category and original query, "
+                "querying the appropriate ChromaDB collection, and returning the results."
+            ),
+            verbose=True,
+            allow_delegation=False,
+            llm=retrieval_llm,
+            max_iter=3,
+            tools=[query_collection_tool],
+        )
+
+        retriever_task = Task(
+            description=(
+                "Take the category from the categorization task and the original query, "
+                "use them to query the appropriate ChromaDB collection, and return the results. "
+                f"Current query: {query.query}"
+            ),
+            expected_output=(
+                "An object containing the category, query, and context from ChromaDB"
+            ),
+            agent=retriever_agent,
             context=[categorization_task],
         )
 
+        @tool("generate_response_tool")
+        def generate_response_tool(context: str, query: str) -> dict:
+            """Tool to generate a response using the specific prompt template"""
+            prompt = f"""<|start_of_role|>system<|end_of_role|>
+                        - You are a helpful, respectful, and honest assistant that can summarize long documents.
+                        - Always respond as helpfully as possible, while being safe.
+                        - Your responses should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content.
+                        - Please ensure that your responses are socially unbiased and positive in nature.
+                        - If a document does not make any sense, or is not factually coherent, explain why instead of responding something not correct.
+                        - If you don't know the response to a query, please do not share false information.
+                        <|start_of_role|>user<|end_of_role|>
+                        You are an assistant for question-answering tasks. Generate a conversational response for the given question based on the given set of document context. Think step by step to answer in a crisp manner. Answer should not be more than 300 words. If you do not find any relevant answer in the given documents, please state you do not have an answer. Do not try to generate any information.
+                        Context : {context}
+                        Question : {query}
+                        Answer: <|start_of_role|>assistant<|end_of_role|>"""
+
+            return {"response": prompt}
+
+        generation_agent = Agent(
+            role="Response Generator",
+            goal="Generate a comprehensive response using the specific prompt template",
+            backstory=(
+                "You are an expert at using structured prompts to generate precise, "
+                "informative responses based on provided context."
+            ),
+            verbose=True,
+            allow_delegation=False,
+            llm=generation_llm,
+            max_iter=3,
+            tools=[generate_response_tool],
+        )
+
+        generation_task = Task(
+            description=(
+                "Using the context and query from the retriever task, generate a response using "
+                "the specific prompt template via generate_response_tool. Return the complete response."
+            ),
+            expected_output="A natural language response following the prompt template structure",
+            agent=generation_agent,
+            context=[retriever_task],
+        )
+
+        # without using the nice prompt from IBM's template studio RAG example
+        # generation_agent = Agent(
+        #     role="Response Generator",
+        #     goal="Generate a comprehensive response based on retrieved context",
+        #     backstory=(
+        #         "You are an expert at synthesizing information from retrieved documents "
+        #         "and generating natural, informative responses to user queries."
+        #     ),
+        #     verbose=True,
+        #     allow_delegation=False,
+        #     llm=generation_llm,
+        # )
+        # generation_task = Task(
+        #     description=(
+        #         "Using the context and query from the retriever task, generate a natural and informative response. "
+        #         "The response should directly answer the user's query using the provided context. "
+        #         "Ensure the response is coherent and conversational."
+        #     ),
+        #     expected_output="A natural language response that answers the user's query based on the retrieved context",
+        #     agent=generation_agent,
+        #     context=[retriever_task],
+        # )
+
         crew = Crew(
-            agents=[collection_selector_agent],
-            tasks=[categorization_task],
+            agents=[collection_selector_agent, retriever_agent, generation_agent],
+            tasks=[categorization_task, retriever_task, generation_task],
             process=Process.sequential,
             verbose=True,
         )
 
         crew_result = crew.kickoff()
-        return {"category": crew_result}
+        return {"response": crew_result}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-        #         # models_available = {
-        #         #     "models_available": [
-        #         #         "codellama/codellama-34b-instruct-hf",
-        #         #         "google/flan-t5-xl",
-        #         #         "google/flan-t5-xxl",
-        #         #         "google/flan-ul2",
-        #         #         "ibm/granite-13b-instruct-v2",
-        #         #         "ibm/granite-20b-code-instruct",
-        #         #         "ibm/granite-20b-multilingual",
-        #         #         "ibm/granite-3-2-8b-instruct-preview-rc",
-        #         #         "ibm/granite-3-2b-instruct",
-        #         #         "ibm/granite-3-8b-instruct",
-        #         #         "ibm/granite-34b-code-instruct",
-        #         #         "ibm/granite-3b-code-instruct",
-        #         #         "ibm/granite-8b-code-instruct",
-        #         #         "ibm/granite-guardian-3-2b",
-        #         #         "ibm/granite-guardian-3-8b",
-        #         #         "meta-llama/llama-2-13b-chat",
-        #         #         "meta-llama/llama-3-1-70b-instruct",
-        #         #         "meta-llama/llama-3-1-8b-instruct",
-        #         #         "meta-llama/llama-3-2-11b-vision-instruct",
-        #         #         "meta-llama/llama-3-2-1b-instruct",
-        #         #         "meta-llama/llama-3-2-3b-instruct",
-        #         #         "meta-llama/llama-3-2-90b-vision-instruct",
-        #         #         "meta-llama/llama-3-3-70b-instruct",
-        #         #         "meta-llama/llama-3-405b-instruct",
-        #         #         "meta-llama/llama-guard-3-11b-vision",
-        #         #         "mistralai/mistral-large",
-        #         #         "mistralai/mixtral-8x7b-instruct-v01",
-        #         #     ]
-        #         # }
 @app.post("/generate_summary", response_model=GenerateSummaryResponse)
 async def generate_summary(
     template_model: str = Body(default="generate_summary"),
@@ -774,45 +950,6 @@ async def generate_json_response(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# @app.post("/agentic-route")
-# async def agentic_route(query: QueryRequest):
-#     try:
-#         apikey = os.environ.get("IBM_APIKEY")
-#         project_id = os.environ.get("PROJECT_ID")
-#         url = os.environ.get("WATSON_URL")
-
-#         # credentials = Credentials(
-#         #     url=url,
-#         #     api_key=apikey,
-#         # )
-#         # model_id = "ibm/granite-3-2b-instruct"
-#         # parameters = {
-#         #     "decoding_method": "sample",
-#         #     "max_new_tokens": 500,
-#         #     "temperature": 0.7,
-#         #     "top_k": 50,
-#         #     "top_p": 1,
-#         #     "repetition_penalty": 1,
-#         # }
-#         # credentials = Credentials(url=url, api_key=apikey)
-#         # ibm_model = Model(
-#         #     model_id=model_id,
-#         #     params=parameters,
-#         #     credentials=credentials,
-#         #     project_id=project_id,
-#         # )
-
-#         # class IBMWatsonLLM(LLM):
-#         #     def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
-#         #         return ibm_model.generate_text(prompt=prompt, guardrails=False)
-
-#         #     @property
-#         #     def _llm_type(self) -> str:
-#         #         return "ibm_watson"
-
-#         #     def generate_text(self, prompt):
-#         #         return self._call(prompt)
-
 #         # llm = IBMWatsonLLM()
 #         # models_available = {
 #         #     "models_available": [
@@ -845,74 +982,3 @@ async def generate_json_response(
 #         #         "mistralai/mixtral-8x7b-instruct-v01",
 #         #     ]
 #         # }
-
-#         llm = LLM(
-#             # model='watsonx/mistralai/mistral-large',
-#             model='watsonx/ibm/granite-3-2b-instruct',
-#             base_url=url,
-#             project_id=project_id,
-#             max_tokens=50,
-#             temperature=0.7,
-#             api_key=apikey
-#         )
-
-
-#         # Agent = Agent(
-#         # role="{topic} specialist",
-#         # goal="Figure {goal} out",
-#         # backstory="I am the master of {role}",
-#         # system_template="""<|start_header_id|>system<|end_header_id|>
-
-#         # {{ .System }}<|eot_id|>""",
-#         # prompt_template="""<|start_header_id|>user<|end_header_id|>
-
-#         # {{ .Prompt }}<|eot_id|>""",
-#         # response_template="""<|start_header_id|>assistant<|end_header_id|>
-
-#         # {{ .Response }}<|eot_id|>""",
-#         # )
-
-#         collection_selector_agent = Agent(
-#             role="Collection Selector",
-#             goal="Analyze user queries and determine the most relevant ChromaDB collection.",
-#             backstory="Expert in query classification. Routes questions to the correct domain.",
-#             verbose=True,
-#             allow_delegation=False,
-#             llm=llm,
-#         )
-
-#         # categorization_task = Task(
-#         #     description=f"""
-#         #     Based on the user query below, determine the best category.
-#         #     You must return ONLY one of these exact values: "Coffee", "Baseball", or "Jack_Russell_Terrier".
-#         #     If the query is unclear, choose the best match.
-
-#         #     User Query: "{query.query}"
-#         #     """,
-#         #     expected_output="Either 'Coffee', 'Baseball', or 'Jack_Russell_Terrier'.",
-#         #     agent=collection_selector_agent,
-#         # )
-
-#         categorization_task = Task(
-#             description=f"""
-#             Based on the user query below, determine the best category.
-#             You must return ONLY one of these exact values: "Coffee", "Baseball", or "Jack_Russell_Terrier".
-#             If the query is unclear, choose the best match.
-
-#             User Query: "{query.query}"
-#             """,
-#             expected_output="Either 'Coffee', 'Baseball', or 'Jack_Russell_Terrier'.",
-#             agent=collection_selector_agent,
-#         )
-
-#         crew = Crew(
-#             agents=[collection_selector_agent],
-#             tasks=[categorization_task],
-#             verbose=True,
-#         )
-
-#         crew_result = crew.kickoff()
-#         return {"category": crew_result}
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))

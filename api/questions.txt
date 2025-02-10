@@ -1,0 +1,87 @@
+----------------------------------
+TECHNICAL QUERIES
+----------------------------------
+"How do I reset my password?"
+(Should retrieve instructions on the password reset process.)
+
+"What are the common login error messages and how do I fix them?"
+(Should return solutions for ERR_001 and ERR_002.)
+
+NOT RELIABLE "How can I enable two-factor authentication (2FA)?"
+(Should retrieve details on enabling 2FA in security settings.)
+
+"What are the API rate limits for different plans?"
+(Should return rate limits for Free, Pro, and Enterprise tiers.)
+
+"How do I authenticate API requests?"
+(Should retrieve details on generating API keys and authentication headers.)
+
+----------------------------------
+BILLING QUERIES
+----------------------------------
+"What payment methods do you accept?"
+(Should retrieve credit card, PayPal, and bank transfer details.)
+
+"How can I download my invoices?"
+(Should return steps on accessing invoices via the Billing History section.)
+
+"What happens if my payment is declined?"
+(Should retrieve troubleshooting steps for declined payments.)
+
+"Do you offer refunds for annual subscriptions?"
+(Should return the refund policy, including time limits for requests.)
+
+"How do I upgrade from Free to Pro plan?"
+(Should retrieve subscription upgrade instructions.)
+
+----------------------------------
+ACCOUNT MANAGEMENT QUERIES
+----------------------------------
+"How do I invite a new team member?"
+(Should return instructions on adding members via Settings → Team.)
+
+"What permissions does an Editor role have?"
+(Should retrieve the capabilities and restrictions of the Editor role.)
+
+"Can I change my company’s time zone setting?"
+(Should return organization settings details.)
+
+"How can I enforce password security for my team?"
+(Should retrieve security settings like password complexity rules.)
+
+"Where can I find audit logs for user activity?"
+(Should return details on accessing logs for security and compliance.)
+
+----------------------------------
+GENERAL QUERIES (TESTING SEMANTIC SEARCH)
+----------------------------------
+"I can’t log in; what should I do?"
+(Should retrieve login troubleshooting steps.)
+
+"Does the Enterprise plan support custom billing cycles?"
+(Should return information about Enterprise plan custom billing.)
+
+"How do I manage API access for my team?"
+(Should retrieve details on generating and managing API keys.)
+
+"What security measures does the platform have?"
+(Should return encryption details, SSO, MFA, and IP whitelisting info.)
+
+"How do I downgrade my subscription?"
+(Should return details on switching plans or canceling the subscription.)
+
+🔹 Bonus: Edge Case Queries
+"Why is my account suspended?"
+(Should retrieve potential billing issues or security-related suspensions.)
+
+"How long are invoices stored in the system?"
+(Should return information on invoice retention.)
+
+"How can I change my account’s primary email?"
+(Should retrieve account update options.)
+
+"What happens if I exceed my API rate limit?"
+(Should retrieve details on rate limits and upgrade options.)
+
+"How do I enable IP restrictions for my team?"
+(Should retrieve security settings on IP whitelisting.)

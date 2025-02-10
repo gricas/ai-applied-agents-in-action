@@ -289,3 +289,177 @@ American professional baseball teams toured Britain in 1874 and 1889, and had a 
 Finnish baseball
 Main article: Pesäpallo
 Finnish baseball, also known as pesäpallo, is a combination of traditional ball-batting team games and North American baseball, invented by Lauri "Tahko" Pihkala in the 1920s.[220][221] The basic idea of pesäpallo is similar to that of baseball: the offense tries to score by hitting the ball successfully and running through the bases, while the defense tries to put the batter and runners out. One of the most important differences between pesäpallo and baseball is that the ball is pitched vertically, which makes hitting the ball, as well as controlling the power and direction of the hit, much easier. This gives the offensive game more variety, speed, and tactical aspects compared to baseball.[220]
+
+
+
+Baseball is a game played between two teams of nine players each. The game is divided into nine innings, each divided into two halves. In the top half of the inning, the players of one team successively come to bat and attempt to score runs, while the other team plays in the field and attempts to stop the offensive team from scoring. In the bottom half, the teams swap places. The team with more runs at the end of nine innings is the winner of the game.
+
+The game is played on a diamond-shaped playing field, the four corners of the diamond being formed by home plate, first base, second base and third base. In the middle of the infield is the pitcher's mound, where the pitcher stands to pitch the ball to the batter. The area beyond the infield, bordered by the first and third baselines, is called the outfield.
+
+During an inning, the pitcher of the defensive team throws the ball toward member of the offensive team currently in batting position at home plate. The batter attempts to hit the ball with the bat to a location out of the reach of the defensive players in the field and run around the bases. If he is able to round the bases and return to home plate, he scores a run. But if the ball is caught, or can be thrown to first base before he arrives at the base, then the batter is out. A batter is also put out if he strikes out, or fails to hit the baseball three times after three good pitches. The offensive team's time at bat is over when it gets three outs.
+
+Baseball Stats
+Baseball isn't statistics. Baseball is DiMaggio rounding second. — Jimmy Cannon
+Unlike most other sports, baseball exists outside of time — there is no clock to control game play or judge a player's performance. Nevertheless, a dizzying array of statistics record nearly every aspect of the game in amazing detail, and allow fans (and team managers!) to compare the performance of one player against another.
+
+Here are a few common player statistics.
+
+Offensive Statistics:
+Batting Average (AVG): The number of base hits per at bat.
+
+Games Played (G): The number of games the player has played in.
+
+At Bats (AB): The official number of times the player as taken the plate as a batter, not counting walks or sacrifices.
+
+Runs (R): The number of times a batter has crossed home plate.
+
+Hits (H): The number of times a batter has safely reached a base, not including walks or sacrifices.
+
+Doubles (2B): The number of hits that resulted in the batter hitting second base.
+
+Triples (3B): The number of hits that resulted in the batter hitting third base.
+
+Home Runs (HR): The number of hits that resulted in a home run.
+
+Runs Batted In (RBI): The number of times a batter has made it possible for his teammates to score. Does not include hits resulting in a double play or runs scored because of an error.
+
+Stolen Bases (SB): The number of times a base runner has successfully advanced to the next base without the help of the hitter.
+
+Base on Balls (BB): The number of times a batter has been awarded first base as a result of four balls being pitched outside the strike zone. Also known as walks.
+
+Strikeouts (SO): The number of times a batter has swung and missed on three pitches.
+
+Pitching Statistics:
+Games Pitched (GP): The cumulative total number of games in which a player has pitched.
+
+Innings Pitched (IP): The cumulative total number of innings pitched by a player.
+
+Wins (W): The number of games won. A starting pitcher will be credited with a win if he pitches at least 5 complete innings, his team is in the lead when he leaves the game and his team continues to maintain the lead for the rest of the game.
+
+Losses (L): The number of games lost.
+
+Win/Loss Percentage (PCT): The total number of wins divided by the sum of wins and losses.
+
+Saves: The number of times a relief pitcher finishes a game where the potential tying or winning run is on base, at bat or on deck.
+
+Hits Allowed (H): The number of hits given up while pitching.
+
+Base on Balls (BB): The number of times a pitcher has thrown four balls, allowing the batter to be awarded first base.
+
+Strikeouts (SO): The number of times a pitcher retires a batter after three strikes.
+
+Earned Run Average (ERA): Earned Run Average The number of Earned Runs (scored without an error) that pitcher allows every nine innings. Computed by multiplying the total number of earned runs by nine and dividing by the number of innings pitched.
+
+Baseball Glossary
+Balk: An illegal motion by the pitcher with one or more runners on base, entitling all runners to advance one base. A balk can be one of a number of movements related to the pitching motion but the intention is to catch the runners off balance.
+
+Ball: A pitch which does not enter the strike zone and is not struck at by the batter.
+
+Base: The four points of the baseball diamond (first through third bases and home plate) that must be touched by a runner in order to score a run.
+
+Batter: The offensive player who is currently positioned in the batter's box.
+
+Batter's Box: Either of the areas next to home plate where the batter stands during his time at bat.
+
+Bottom: The second half of an inning.
+
+Bunt: A legally batted ball, not swung at but intentionally met with the bat and tapped within the infield.
+
+Catch: The act of a fielder in getting secure possession in his hand or glove of a ball in flight and firmly holding it.
+
+Catcher: The defensive player whose position is directly behind home plate.
+
+Defense: The team currently in the field.
+
+Designated Hitter: A player who may be designated to bat instead of the pitcher.
+
+Double: A play in which the batter makes it safely to second base without stopping.
+
+Double Header: Two games played in immediate succession.
+
+Double Play: A defensive play in which two offensive players are put out as a result of one continuous action.
+
+Dugout: The seating area for team members not currently on the playing field.
+
+Fair Ball: A legally batted ball that settles on or over fair territory.
+
+Fair Territory: That part of the playing field within and including the first base and third base lines, from home plate to the playing field fence and perpendicularly upwards.
+
+Fielder: One of the nine defensive players, including pitcher, catcher, first baseman, second baseman, third baseman, shortstop, left fielder, center fielder and right fielder.
+
+Fielder's Choice: The act of a fielder who handles a fair grounder and, instead of throwing to first base to put out the batter runner, throws to another base in an attempt to put out a preceding runner.
+
+Fly Ball: A ball which goes high in the air when batted.
+
+Force Play: A play in which a runner loses his right to occupy a base when the current batter becomes a runner.
+
+Forfeited Game: A game declared ended by the umpire for violation of the rules, and awarded to the offended team.
+
+Foul Ball: A batted ball that lands on foul territory between home plate and first base or third base, bounds past first or third base on or over third territory, first touches foul territory beyond first or third base, or touches a player, umpire or any object not part of the playing field while over foul territory.
+
+Foul Territory: That part of the playing field outside the first and third base lines extended to the outfield fence and perpendicularly upwards.
+
+Ground Ball: A batted ball which rolls along the ground.
+
+Ground Rule Double: When a line drive bounces on the field and over the wall in fair territory the hit is scored as a ground rule double and the batter advances to second base.
+
+Home Plate: The base over which an offensive player bats, and to which he must return after touching all three bases in order to score a run.
+
+Home Run: A play in which the batter makes it safely around all bases and back to home plate without stopping.
+
+Home Team: The team on whose field the game is played. If the game is played on neutral grounds, the home team shall be designated by mutual agreement.
+
+Infield: The diamond-shaped portion of the playing field bordered by the four bases.
+
+Infielder: A fielder who occupies a position in the infield.
+
+Infield Fly: A fair fly ball which can be caught by an infielder with ordinary effort, which first and second, or first, second and third bases are occupied before the second out. Infield Fly Rule: On the infield fly rule the umpire is to rule whether the ball could ordinarily have been handled by an infielder not by some arbitrary limitation such as the grass, or the base lines. The umpire's judgment must govern, and the decision should be made immediately. When an infield fly rule is called, runners may advance at their own risk. If on an infield fly rule, the infielder intentionally drops a fair ball, the ball remains in play.
+
+Inning: That portion of the game within which the teams alternate on offense and defense and in which there are three outs for each team. Each team's time at bat is a half-inning.
+
+Line Drive: A ball which is batted directly to a fielder without touching the ground.
+
+Offense: The team currently at bat.
+
+Out: A declaration by the umpire that a player who is trying for a base is not entitled to that base.
+
+Outfield: The portion of the playing field that extends beyond the infield and is bordered by the first and third baselines.
+
+Outfielder: A fielder who occupies a position in the outfield.
+
+Pitch: The ball delivered by the pitcher to the batter.
+
+Pitcher: The fielder designated to pitch the ball to the batter.
+
+Quick Return Pitch: An illegal pitch, made with obvious intent to catch the batter off balance.
+
+Run: The score made by an offensive player who has rounded the bases and returned to home plate.
+
+Runner: An offensive player who is advancing toward, touching or returning to any base.
+
+Safe: A declaration by the umpire that a runner who is trying for a base has not been tagged or forced out, and is therefore entitled to that base.
+
+Single: A play in which the batter safely makes it to first base.
+
+Strike: A legal pitch when so called by the umpire, which:
+
+Is struck at by the batter and missed;
+Is not struck at, if the ball passes through the strike zone;
+Is fouled by the batter when he has less than two strikes;
+Is bunted foul;
+Touches the batter as he strikes at it;
+Touches the batter in flight in the strike zone; or
+After being batted, travels directly from the bat to the catcher's hands and is legally caught by the catcher (foul tip).
+Strike Zone: An area directly over home plate, from the bottom of the batter's kneecaps to the midpoint between the top of the batter's shoulders and the top of the batter's uniform pants.
+
+Tag: The action of a fielder in touching a base with his body while holding the ball, or touching a runner with the ball, or with his hand or glove while holding the ball.
+
+Throw: The act of propelling the ball toward a given objective, usually a teammate. A pitch is not a throw.
+
+Top: The first half of an inning.
+
+Triple: A play in which the batter makes it safely to third base without stopping.
+
+Triple Play: A defensive play in which three offensive players are put out as a result of one action.
+
+Umpire: The official who judges the legality of individual plays and who otherwise enforces the rules of the game.
