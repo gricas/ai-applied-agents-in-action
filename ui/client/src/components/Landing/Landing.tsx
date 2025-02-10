@@ -13,8 +13,10 @@ import {
 import ChatWindow from '../ChatWindow';
 
 // Component Imports
-import PetForm from '../PetForm';
 import UploadFileComponent from '../UploadFileComponent';
+
+const APPLICATION_NAME =
+  process.env.APPLICATION_NAME || 'AI Applied Demo';
 
 export default function LandingPage() {
   return (
@@ -25,7 +27,7 @@ export default function LandingPage() {
             <a href='/'>Home</a>
           </BreadcrumbItem>
         </Breadcrumb>
-        <h1 className='landing-page__heading'>AI Applied Demo</h1>
+        <h1 className='landing-page__heading'>{APPLICATION_NAME}</h1>
       </Column>
       <Column lg={16} md={8} sm={4} className='landing-page__r2'>
         <Tabs defaultSelectedIndex={0}>

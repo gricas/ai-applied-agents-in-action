@@ -459,7 +459,7 @@ async def rag_query(request: QueryRequest):
 
         query_embedding = embedding_model.embed_query(request.query)
 
-        collection = chroma_client.get_collection("coffee")
+        collection = chroma_client.get_collection("technical")
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=2,  # 3 results seems like it gives good answers
@@ -510,6 +510,15 @@ async def rag_query(request: QueryRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class CategoryResponse(BaseModel):
+    category: str
+
+
+class FinalResponse(BaseModel):
+    category: str
+    response: str
 
 
 @app.post("/agentic-route")
@@ -571,78 +580,13 @@ async def agentic_route(query: QueryRequest):
             
             User Query: "{query.query}"
             """,
-            expected_output="Either 'technical', 'billing', or 'account'",
+            # expected_output="Either 'technical', 'billing', or 'account'",
+            expected_output="A JSON object with a 'category' field that must be either 'technical', 'billing', or 'account'",
             agent=collection_selector_agent,
+            output_json=CategoryResponse,
             # may need to use this to ensure correct response
             # output_pydantic=CategoryResponse
         )
-
-        # Original categories, dogs, coffee, and baseball. My dataset stinks
-        # so maybe just generate synth data for something else...
-
-        # categorization_task = Task(
-        #     description=f"""
-        #     Based on the user query below, determine the best category.
-        #     You must return ONLY one of these exact values: "coffee", "baseball", or "dogs".
-        #     IMPORTANT: You must respond with EXACTLY ONE WORD from this list:
-        #     Coffee
-        #     Baseball
-        #     Dogs
-
-        #     DO NOT include any other text, punctuation, or explanation.
-        #     DO NOT wrap the word in quotes or slashes.
-        #     INCORRECT examples:
-        #     - "/dogs/"
-        #     - "I think baseball"
-        #     - "The category is coffee"
-
-        #     User Query: "{query.query}"
-        #     """,
-        #     expected_output="Either 'coffee', 'baseball', or 'dogs'.",
-        #     agent=collection_selector_agent,
-        #     # may need to use this to ensure correct response
-        #     # output_pydantic=CategoryResponse
-        # )
-
-        # @tool("query_collection_tool")
-        # def query_collection_tool(category: str, query: str) -> dict:
-        #     """Tool to query ChromaDB based on category and return relevant documents"""
-
-        #     credentials = Credentials(
-        #         url=url,
-        #         api_key=apikey,
-        #     )
-
-        #     embedding_model = Embeddings(
-        #         model_id="intfloat/multilingual-e5-large",
-        #         credentials=credentials,
-        #         project_id=project_id,
-        #         verify=True,
-        #     )
-
-        #     query_embedding = embedding_model.embed_query(query)
-        #     collection = chroma_client.get_collection(category.lower())
-        #     results = collection.query(
-        #         query_embeddings=[query_embedding],
-        #         n_results=5,
-        #         include=["documents", "metadatas", "distances"],
-        #     )
-
-        #     relevant_documents = []
-        #     for doc, metadata, distance in zip(
-        #         results["documents"][0],
-        #         results["metadatas"][0],
-        #         results["distances"][0],
-        #     ):
-        #         metadata["collection"] = category.lower()
-        #         metadata["relevance_score"] = 1 - distance
-        #         relevant_documents.append({"content": doc, "metadata": metadata})
-
-        #     context = "\n\n".join(
-        #         [f"Content:\n{doc['content']}" for doc in relevant_documents]
-        #     )
-
-        #     return {"category": category, "query": query, "context": context}
 
         @tool("query_collection_tool")
         def query_collection_tool(category: str, query: str) -> dict:
@@ -758,33 +702,12 @@ async def agentic_route(query: QueryRequest):
                 "Using the context and query from the retriever task, generate a response using "
                 "the specific prompt template via generate_response_tool. Return the complete response."
             ),
-            expected_output="A natural language response following the prompt template structure",
+            # expected_output="A natural language response following the prompt template structure",
+            expected_output="A JSON object with 'category' and 'response' fields, where 'response' contains the natural language answer",
             agent=generation_agent,
             context=[retriever_task],
+            output_json=FinalResponse,
         )
-
-        # without using the nice prompt from IBM's template studio RAG example
-        # generation_agent = Agent(
-        #     role="Response Generator",
-        #     goal="Generate a comprehensive response based on retrieved context",
-        #     backstory=(
-        #         "You are an expert at synthesizing information from retrieved documents "
-        #         "and generating natural, informative responses to user queries."
-        #     ),
-        #     verbose=True,
-        #     allow_delegation=False,
-        #     llm=generation_llm,
-        # )
-        # generation_task = Task(
-        #     description=(
-        #         "Using the context and query from the retriever task, generate a natural and informative response. "
-        #         "The response should directly answer the user's query using the provided context. "
-        #         "Ensure the response is coherent and conversational."
-        #     ),
-        #     expected_output="A natural language response that answers the user's query based on the retrieved context",
-        #     agent=generation_agent,
-        #     context=[retriever_task],
-        # )
 
         crew = Crew(
             agents=[collection_selector_agent, retriever_agent, generation_agent],
@@ -794,7 +717,12 @@ async def agentic_route(query: QueryRequest):
         )
 
         crew_result = crew.kickoff()
+
         return {"response": crew_result}
+
+        return FinalResponse(
+            category=crew_result["category"], response=crew_result["response"]
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -982,3 +910,26 @@ async def generate_json_response(
 #         #         "mistralai/mixtral-8x7b-instruct-v01",
 #         #     ]
 #         # }
+
+# without using the nice prompt from IBM's template studio RAG example
+# generation_agent = Agent(
+#     role="Response Generator",
+#     goal="Generate a comprehensive response based on retrieved context",
+#     backstory=(
+#         "You are an expert at synthesizing information from retrieved documents "
+#         "and generating natural, informative responses to user queries."
+#     ),
+#     verbose=True,
+#     allow_delegation=False,
+#     llm=generation_llm,
+# )
+# generation_task = Task(
+#     description=(
+#         "Using the context and query from the retriever task, generate a natural and informative response. "
+#         "The response should directly answer the user's query using the provided context. "
+#         "Ensure the response is coherent and conversational."
+#     ),
+#     expected_output="A natural language response that answers the user's query based on the retrieved context",
+#     agent=generation_agent,
+#     context=[retriever_task],
+# )
