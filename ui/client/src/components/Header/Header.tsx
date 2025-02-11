@@ -22,6 +22,7 @@ import {
   UserAvatar,
 } from '@carbon/icons-react';
 
+
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const BRANDING_NAME = process.env.BRANDING_NAME || 'IBM';
