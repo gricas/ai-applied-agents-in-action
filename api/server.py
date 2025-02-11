@@ -13,13 +13,12 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from ibm_watsonx_ai.foundation_models import Embeddings
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
-from ibm_watsonx_ai.foundation_models import ModelInference, Model
+from ibm_watsonx_ai.foundation_models import ModelInference
 from ibm_watsonx_ai import Credentials
 
 
 from langchain_ibm import WatsonxLLM
 
-# from langchain.llms.base import LLM
 from crewai import Agent, Task, Crew, Process, LLM
 from langchain.tools import tool
 
@@ -32,13 +31,10 @@ import chromadb
 from routes.models import ModelRequest
 
 from schemas import (
-    TestRequest,
     ExamplesTemplate,
     PromptTemplateRequest,
     JSONResponseTemplate,
-    GeneratePetNameResponse,
     GenerateSummaryResponse,
-    ClasificationResponse,
 )
 
 # Set up basic logging
@@ -117,6 +113,40 @@ def load_examples():
 app = FastAPI(lifespan=lifespan)
 
 
+# List of available models for watsonx
+available_watsonx_models = {
+    "models_available": [
+        "codellama/codellama-34b-instruct-hf",
+        "google/flan-t5-xl",
+        "google/flan-t5-xxl",
+        "google/flan-ul2",
+        "ibm/granite-13b-instruct-v2",
+        "ibm/granite-20b-code-instruct",
+        "ibm/granite-20b-multilingual",
+        "ibm/granite-3-2-8b-instruct-preview-rc",
+        "ibm/granite-3-2b-instruct",
+        "ibm/granite-3-8b-instruct",
+        "ibm/granite-34b-code-instruct",
+        "ibm/granite-3b-code-instruct",
+        "ibm/granite-8b-code-instruct",
+        "ibm/granite-guardian-3-2b",
+        "ibm/granite-guardian-3-8b",
+        "meta-llama/llama-2-13b-chat",
+        "meta-llama/llama-3-1-70b-instruct",
+        "meta-llama/llama-3-1-8b-instruct",
+        "meta-llama/llama-3-2-11b-vision-instruct",
+        "meta-llama/llama-3-2-1b-instruct",
+        "meta-llama/llama-3-2-3b-instruct",
+        "meta-llama/llama-3-2-90b-vision-instruct",
+        "meta-llama/llama-3-3-70b-instruct",
+        "meta-llama/llama-3-405b-instruct",
+        "meta-llama/llama-guard-3-11b-vision",
+        "mistralai/mistral-large",
+        "mistralai/mixtral-8x7b-instruct-v01",
+    ]
+}
+
+
 @app.get("/health")
 async def health():
     """
@@ -124,7 +154,9 @@ async def health():
     """
     return {"message": "Fast API up!"}
 
+
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
+
 
 @app.post("/process-documents")
 async def process_documents(files: List[UploadFile] = File(...)):
@@ -308,88 +340,6 @@ async def clear_database():
             chroma_client.delete_collection(name=name)
 
         return {"message": f"Successfully deleted {len(collection_names)} collections"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/search")
-async def search_documents(query: str):
-    """
-    Simple search against one collection.
-    """
-    try:
-        apikey = os.environ.get("IBM_APIKEY")
-        project_id = os.environ.get("PROJECT_ID")
-        url = os.environ.get("WATSON_URL")
-        credentials = Credentials(
-            url=url,
-            api_key=apikey,
-        )
-
-        embedding_model = Embeddings(
-            model_id="intfloat/multilingual-e5-large",
-            credentials=credentials,
-            project_id=project_id,
-        )
-
-        collection = chroma_client.get_collection(name="document_collection")
-
-        query_embedding = embedding_model.embed_documents(texts=[query])
-
-        results = collection.query(query_embeddings=query_embedding, n_results=3)
-
-        return {
-            "query": query,
-            "matches": {
-                "documents": results["documents"][0],
-                "distances": results["distances"][0],
-                "ids": results["ids"][0],
-            },
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/search-all")
-async def search_all_documents(query: str):
-    """
-    Search across all collections. Not best practice, but you know, just to
-    show a before and after agentic RAG.
-    """
-    try:
-        apikey = os.environ.get("IBM_APIKEY")
-        project_id = os.environ.get("PROJECT_ID")
-        url = os.environ.get("WATSON_URL")
-        credentials = Credentials(
-            url=url,
-            api_key=apikey,
-        )
-        embedding_model = Embeddings(
-            model_id="intfloat/multilingual-e5-large",
-            credentials=credentials,
-            project_id=project_id,
-        )
-
-        query_embedding = embedding_model.embed_documents(texts=[query])
-
-        collections = chroma_client.list_collections()
-
-        all_results = []
-        for collection_name in collections:
-            collection = chroma_client.get_collection(name=collection_name)
-            results = collection.query(query_embeddings=query_embedding, n_results=1)
-
-            result = {
-                "collection_name": collection_name,
-                "documents": results["documents"][0],
-                "distances": results["distances"][0],
-                "ids": results["ids"][0],
-            }
-            all_results.append(result)
-
-        sorted_results = sorted(all_results, key=lambda x: x["distances"][0])
-
-        return {"query": query, "matches": sorted_results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -748,19 +698,6 @@ async def generate_summary(
     return result
 
 
-@app.post("/generate_pet_name", response_model=GeneratePetNameResponse)
-async def generate_pet_name(
-    template_model: str = Body(default="pet_namer"),
-    prompt_template_name: str = Body(default="pet_namer"),
-    prompt_template_kwargs: Dict[str, str] = Body(...),
-):
-
-    response = await generate_json_response(
-        template_model, prompt_template_name, prompt_template_kwargs
-    )
-    return response
-
-
 async def generated_text_response(
     template_model: str,
     prompt_template_name: str,
@@ -880,60 +817,3 @@ async def generate_json_response(
     except Exception as e:
         logging.error(f"Error in generate_response: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-#         # llm = IBMWatsonLLM()
-#         # models_available = {
-#         #     "models_available": [
-#         #         "codellama/codellama-34b-instruct-hf",
-#         #         "google/flan-t5-xl",
-#         #         "google/flan-t5-xxl",
-#         #         "google/flan-ul2",
-#         #         "ibm/granite-13b-instruct-v2",
-#         #         "ibm/granite-20b-code-instruct",
-#         #         "ibm/granite-20b-multilingual",
-#         #         "ibm/granite-3-2-8b-instruct-preview-rc",
-#         #         "ibm/granite-3-2b-instruct",
-#         #         "ibm/granite-3-8b-instruct",
-#         #         "ibm/granite-34b-code-instruct",
-#         #         "ibm/granite-3b-code-instruct",
-#         #         "ibm/granite-8b-code-instruct",
-#         #         "ibm/granite-guardian-3-2b",
-#         #         "ibm/granite-guardian-3-8b",
-#         #         "meta-llama/llama-2-13b-chat",
-#         #         "meta-llama/llama-3-1-70b-instruct",
-#         #         "meta-llama/llama-3-1-8b-instruct",
-#         #         "meta-llama/llama-3-2-11b-vision-instruct",
-#         #         "meta-llama/llama-3-2-1b-instruct",
-#         #         "meta-llama/llama-3-2-3b-instruct",
-#         #         "meta-llama/llama-3-2-90b-vision-instruct",
-#         #         "meta-llama/llama-3-3-70b-instruct",
-#         #         "meta-llama/llama-3-405b-instruct",
-#         #         "meta-llama/llama-guard-3-11b-vision",
-#         #         "mistralai/mistral-large",
-#         #         "mistralai/mixtral-8x7b-instruct-v01",
-#         #     ]
-#         # }
-
-# without using the nice prompt from IBM's template studio RAG example
-# generation_agent = Agent(
-#     role="Response Generator",
-#     goal="Generate a comprehensive response based on retrieved context",
-#     backstory=(
-#         "You are an expert at synthesizing information from retrieved documents "
-#         "and generating natural, informative responses to user queries."
-#     ),
-#     verbose=True,
-#     allow_delegation=False,
-#     llm=generation_llm,
-# )
-# generation_task = Task(
-#     description=(
-#         "Using the context and query from the retriever task, generate a natural and informative response. "
-#         "The response should directly answer the user's query using the provided context. "
-#         "Ensure the response is coherent and conversational."
-#     ),
-#     expected_output="A natural language response that answers the user's query based on the retrieved context",
-#     agent=generation_agent,
-#     context=[retriever_task],
-# )

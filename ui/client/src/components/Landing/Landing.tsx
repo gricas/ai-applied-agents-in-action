@@ -33,7 +33,7 @@ export default function LandingPage() {
         <Tabs defaultSelectedIndex={0}>
           <TabList className='tabs-group' aria-label='Page navigation'>
             <Tab>Chat with your docs</Tab>
-            <Tab>Upload Docs to Vector DB</Tab>
+            {/*<Tab>Upload Docs to Vector DB</Tab>*/}
           </TabList>
           <TabPanels>
             <TabPanel>
@@ -43,13 +43,13 @@ export default function LandingPage() {
                 </Column>
               </Grid>
             </TabPanel>
-            <TabPanel>
+            {/*<TabPanel>
               <Grid className='tabs-group-content' fullWidth>
                 <Column sm={4} md={8} lg={16}>
                   <UploadFileComponent/>
                 </Column>
               </Grid>
-            </TabPanel>
+            </TabPanel>*/}
           </TabPanels>
         </Tabs>
       </Column>

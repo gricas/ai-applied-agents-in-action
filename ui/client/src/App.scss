@@ -3,7 +3,6 @@
 
 @use '../src/components/Header/header';
 @use '../src/components/Landing/landing';
-@use '../src/components/PetForm/pet-form';
 @use '../src/components/ChatWindow/chat-window';
 @use '../src/components/UploadFileComponent/upload-file-component';
 
@@ -37,7 +36,7 @@
   }
 }
 .cds--g90, .cds--layer-one {
-  min-height: 100vh;
+  min-height: 96vh;
 }
 
 .cds--accordion__title {
