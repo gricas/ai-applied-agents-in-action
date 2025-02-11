@@ -1,27 +1,18 @@
 import json
 import os
-from typing import Dict, List, Any
+from typing import Dict, List
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, status, HTTPException, Body, UploadFile, File
-from langchain_core.output_parsers import StrOutputParser
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import PydanticOutputParser
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from ibm_watsonx_ai.foundation_models import Embeddings
-from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
-from ibm_watsonx_ai.foundation_models import ModelInference
 from ibm_watsonx_ai import Credentials
-
-
-from langchain_ibm import WatsonxLLM
 
 from crewai import Agent, Task, Crew, Process, LLM
 from langchain.tools import tool
-
 
 from pydantic import BaseModel, Field
 
@@ -33,8 +24,6 @@ from routes.models import ModelRequest
 from schemas import (
     ExamplesTemplate,
     PromptTemplateRequest,
-    JSONResponseTemplate,
-    GenerateSummaryResponse,
 )
 
 # Set up basic logging
@@ -93,7 +82,8 @@ def load_prompt_templates():
             with open(file_path, "r") as f:
                 template = f.read()
             template_name = filename[:-4]
-            prompt_templates[template_name] = PromptTemplateRequest(template=template)
+            prompt_templates[template_name] = PromptTemplateRequest(
+                template=template)
 
 
 def load_examples():
@@ -106,7 +96,8 @@ def load_examples():
             with open(file_path, "r") as f:
                 template = f.read()
             template_name = filename[:-4]
-            examples_templates[template_name] = ExamplesTemplate(template=template)
+            examples_templates[template_name] = ExamplesTemplate(
+                template=template)
 
 
 # Initialize FastAPI app with custom lifespan
@@ -166,7 +157,8 @@ async def process_documents_by_collection(files: List[UploadFile] = File(...)):
         project_id = os.environ.get("PROJECT_ID")
         url = os.environ.get("WATSON_URL")
         if not (apikey and project_id and url):
-            raise ValueError("Missing one or more required environment variables.")
+            raise ValueError(
+                "Missing one or more required environment variables.")
 
         credentials = Credentials(
             url=url,
@@ -183,7 +175,8 @@ async def process_documents_by_collection(files: List[UploadFile] = File(...)):
                 content = await upload.read()
                 txt_files.append((upload.filename, content))
             else:
-                print(f"Skipping file {upload.filename} as it is not a .txt file.")
+                print(
+                    f"Skipping file {upload.filename} as it is not a .txt file.")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             for filename, content in txt_files:
@@ -215,7 +208,7 @@ async def process_documents_by_collection(files: List[UploadFile] = File(...)):
 
                 batch_size = 100
                 for i in range(0, len(splits), batch_size):
-                    batch = splits[i : i + batch_size]
+                    batch = splits[i: i + batch_size]
                     texts = [doc.page_content for doc in batch]
                     metadatas = [doc.metadata for doc in batch]
                     embeddings = embedding_model.embed_documents(
@@ -225,7 +218,8 @@ async def process_documents_by_collection(files: List[UploadFile] = File(...)):
                         embeddings=embeddings,
                         documents=texts,
                         metadatas=metadatas,
-                        ids=[f"{file_name}_{i}_{j}" for j in range(len(batch))],
+                        ids=[f"{file_name}_{i}_{j}" for j in range(
+                            len(batch))],
                     )
 
         return {
@@ -405,7 +399,8 @@ async def agentic_route(query: QueryRequest):
                 if similarity > 0.8:  # should adjust? maybe?
                     metadata["collection"] = category.lower()
                     metadata["relevance_score"] = similarity
-                    relevant_documents.append({"content": doc, "metadata": metadata})
+                    relevant_documents.append(
+                        {"content": doc, "metadata": metadata})
 
             relevant_documents.sort(
                 key=lambda x: x["metadata"]["relevance_score"], reverse=True
@@ -494,7 +489,8 @@ async def agentic_route(query: QueryRequest):
         )
 
         crew = Crew(
-            agents=[collection_selector_agent, retriever_agent, generation_agent],
+            agents=[collection_selector_agent,
+                    retriever_agent, generation_agent],
             tasks=[categorization_task, retriever_task, generation_task],
             process=Process.sequential,
             verbose=True,
@@ -505,141 +501,4 @@ async def agentic_route(query: QueryRequest):
         return {"response": crew_result}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/generate_summary", response_model=GenerateSummaryResponse)
-async def generate_summary(
-    template_model: str = Body(default="generate_summary"),
-    prompt_template_name: str = Body(default="generate_summary"),
-    prompt_template_kwargs: Dict[str, str] = Body(...),
-):
-    """
-    Endpoint to generate a summary based on provided data.
-    """
-    response = await generated_text_response(
-        template_model, prompt_template_name, prompt_template_kwargs
-    )
-    result = {"generated_text": response}
-    return result
-
-
-async def generated_text_response(
-    template_model: str,
-    prompt_template_name: str,
-    prompt_template_kwargs: Dict[str, Any],
-) -> str:
-    """
-    Common functionality to generate a response using a specified model
-    and prompt template.
-
-    Args:
-        template_model (str): The name of the models type to use.
-        prompt_template_name (str): The name of the prompt template to use.
-        prompt_template_kwargs (Dict[str, Any]): The keyword arguments for the prompt template.
-
-    Returns:
-        str: The generated text response from the model.
-    """
-    try:
-        model_request = models.get(template_model)
-        if not model_request:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Model with name {template_model} not found",
-            )
-
-        prompt_template_request = prompt_templates.get(prompt_template_name)
-        if not prompt_template_request:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"PromptTemplate with name {prompt_template_name} not found",
-            )
-
-        examples = examples_templates.get(
-            prompt_template_name, ExamplesTemplate(template="")
-        )
-        if not examples:
-            logging.warning(
-                f"Examples for prompt template {prompt_template_name} not found. Using empty string."
-            )
-
-        model = model_request.get_model()
-        prompt_template = PromptTemplate.from_template(
-            template=prompt_template_request.template
-        )
-        output_parser = StrOutputParser()
-
-        prompt_template_kwargs["examples"] = examples.template
-
-        chain = prompt_template | model | output_parser
-        generated_text = chain.invoke(prompt_template_kwargs)
-
-        return generated_text
-    except Exception as e:
-        logging.error(f"Error in generate_response: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def generate_json_response(
-    template_model: str,
-    prompt_template_name: str,
-    prompt_template_kwargs: Dict[str, Any],
-) -> dict:
-    """
-    Generate a JSON response using a specified model and prompt template.
-
-    Args:
-        template_model (str): The name of the language model to use.
-        prompt_template_name (str): The name of the prompt template to use.
-        prompt_template_kwargs (Dict[str, Any]): The keyword arguments for the prompt template.
-
-    Returns:
-        dict: A dictionary containing the generated response in JSON format.
-              The response is nested under the key 'generated_text'.
-
-    Raises:
-        HTTPException: If the specified model or prompt template is not found,
-                       or if there's an error during the generation process.
-    """
-    try:
-        model_request = models.get(template_model)
-        if not model_request:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Model with name {template_model} not found",
-            )
-
-        prompt_template_request = prompt_templates.get(prompt_template_name)
-        if not prompt_template_request:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"PromptTemplate with name {prompt_template_name} not found",
-            )
-
-        examples = examples_templates.get(
-            prompt_template_name, ExamplesTemplate(template="")
-        )
-        if not examples:
-            logging.warning(
-                f"Examples for prompt template {prompt_template_name} not found. Using empty string."
-            )
-
-        model = model_request.get_model()
-        prompt_template = PromptTemplate.from_template(
-            template=prompt_template_request.template
-        )
-        output_parser = PydanticOutputParser(pydantic_object=JSONResponseTemplate)
-        format_instructions = output_parser.get_format_instructions()
-
-        prompt_template_kwargs["format_instructions"] = format_instructions
-        prompt_template_kwargs["examples"] = examples.template
-
-        chain = prompt_template | model | output_parser
-        results = chain.invoke(prompt_template_kwargs)
-
-        result = {"generated_text": results.dict()}
-        return result
-    except Exception as e:
-        logging.error(f"Error in generate_response: {e}")
         raise HTTPException(status_code=500, detail=str(e))
