@@ -23,7 +23,7 @@ from crewai import Agent, Task, Crew, Process, LLM
 from langchain.tools import tool
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import tempfile
 import chromadb
@@ -158,87 +158,16 @@ async def health():
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
 
-@app.post("/process-documents")
-async def process_documents(files: List[UploadFile] = File(...)):
-    try:
-
-        apikey = os.environ.get("IBM_APIKEY")
-        project_id = os.environ.get("PROJECT_ID")
-        url = os.environ.get("WATSON_URL")
-
-        credentials = Credentials(
-            url=url,
-            api_key=apikey,
-        )
-
-        embedding_model = Embeddings(
-            model_id="intfloat/multilingual-e5-large",
-            credentials=credentials,
-            project_id=project_id,
-        )
-        with tempfile.TemporaryDirectory() as temp_dir:
-            documents = []
-
-            for file in files:
-                file_path = os.path.join(temp_dir, file.filename)
-                file_name = os.path.splitext(file.filename)[0]
-                print(f"FILE NAME IS: {file_name}")
-                with open(file_path, "wb") as buffer:
-                    content = await file.read()
-                    buffer.write(content)
-                if file.filename.endswith(".pdf"):
-                    loader = PyPDFLoader(file_path)
-                elif file.filename.endswith(".txt"):
-                    loader = TextLoader(file_path)
-                else:
-                    raise HTTPException(status_code=400, detail="Unsupported file type")
-
-                documents.extend(loader.load())
-
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=800,
-                chunk_overlap=100,
-                length_function=len,
-                is_separator_regex=False,
-            )
-            splits = text_splitter.split_documents(documents)
-
-            collection = chroma_client.get_or_create_collection(
-                name="document_collection", metadata={"hnsw:space": "cosine"}
-            )
-
-            batch_size = 100
-            for i in range(0, len(splits), batch_size):
-                batch = splits[i : i + batch_size]
-
-                texts = [doc.page_content for doc in batch]
-                metadatas = [doc.metadata for doc in batch]
-
-                embeddings = embedding_model.embed_documents(
-                    texts=texts,
-                    concurrency_limit=10,
-                )
-
-                collection.add(
-                    embeddings=embeddings,
-                    documents=texts,
-                    metadatas=metadatas,
-                    ids=[f"doc_{i}_{j}" for j in range(len(batch))],
-                )
-
-        return {"message": f"Successfully processed {len(files)} documents"}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/process-documents-by-collection")
-async def process_documents_by_collection():
+async def process_documents_by_collection(files: List[UploadFile] = File(...)):
     txt_files = []
     try:
         apikey = os.environ.get("IBM_APIKEY")
         project_id = os.environ.get("PROJECT_ID")
         url = os.environ.get("WATSON_URL")
+        if not (apikey and project_id and url):
+            raise ValueError("Missing one or more required environment variables.")
+
         credentials = Credentials(
             url=url,
             api_key=apikey,
@@ -249,16 +178,15 @@ async def process_documents_by_collection():
             project_id=project_id,
         )
 
-        for filename in os.listdir("docs"):
-            if filename.endswith(".txt"):
-                file_path = os.path.join("docs", filename)
-                with open(file_path, "rb") as f:
-                    content = f.read()
-                    txt_files.append(("files", (filename, content, "text/plain")))
+        for upload in files:
+            if upload.filename.endswith(".txt"):
+                content = await upload.read()
+                txt_files.append((upload.filename, content))
+            else:
+                print(f"Skipping file {upload.filename} as it is not a .txt file.")
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            for file_tuple in txt_files:
-                _, (filename, content, _) = file_tuple
+            for filename, content in txt_files:
                 file_path = os.path.join(temp_dir, filename)
                 file_name = os.path.splitext(filename)[0]
 
@@ -266,7 +194,6 @@ async def process_documents_by_collection():
                     buffer.write(content)
 
                 loader = TextLoader(file_path)
-
                 text_splitter = RecursiveCharacterTextSplitter(
                     chunk_size=800,
                     chunk_overlap=100,
@@ -276,6 +203,7 @@ async def process_documents_by_collection():
                 )
                 documents = loader.load()
                 splits = text_splitter.split_documents(documents)
+
                 collection = chroma_client.get_or_create_collection(
                     name=file_name.lower(),
                     metadata={
@@ -307,148 +235,51 @@ async def process_documents_by_collection():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/list-collections")
-async def list_collections():
-    """
-    Route to list all collections in your chromadb.
-    """
-    try:
-        collection_names = chroma_client.list_collections()
-
-        collections_info = []
-        for name in collection_names:
-            collection = chroma_client.get_collection(name)
-            collections_info.append({"name": name, "count": collection.count()})
-
-        return {
-            "total_collections": len(collections_info),
-            "collections": collections_info,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.delete("/clear-db")
-async def clear_database():
-    """
-    Route to clear all collections from your chromadb.
-    """
-    try:
-        collection_names = chroma_client.list_collections()
-
-        for name in collection_names:
-            chroma_client.delete_collection(name=name)
-
-        return {"message": f"Successfully deleted {len(collection_names)} collections"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 class QueryRequest(BaseModel):
-    query: str
-
-
-@app.post("/rag-query")
-async def rag_query(request: QueryRequest):
-    try:
-        apikey = os.environ.get("IBM_APIKEY")
-        project_id = os.environ.get("PROJECT_ID")
-        url = os.environ.get("WATSON_URL")
-
-        credentials = Credentials(
-            url=url,
-            api_key=apikey,
-        )
-
-        embedding_model = Embeddings(
-            model_id="intfloat/multilingual-e5-large",
-            credentials=credentials,
-            project_id=project_id,
-            verify=True,
-        )
-
-        parameters = {
-            "decoding_method": "greedy",
-            "min_new_tokens": 1,
-            "max_new_tokens": 300,
-            "stop_sequences": ["<|endoftext|>"],
-        }
-
-        model = ModelInference(
-            model_id="ibm/granite-3-8b-instruct",
-            credentials=credentials,
-            params=parameters,
-            project_id=project_id,
-        )
-
-        watsonx_llm = WatsonxLLM(watsonx_model=model)
-
-        query_embedding = embedding_model.embed_query(request.query)
-
-        collection = chroma_client.get_collection("technical")
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=2,  # 3 results seems like it gives good answers
-            include=["documents", "metadatas", "distances"],
-        )
-
-        relevant_documents = []
-        for doc, metadata, distance in zip(
-            results["documents"][0], results["metadatas"][0], results["distances"][0]
-        ):
-            metadata["collection"] = "coffee"
-            metadata["relevance_score"] = 1 - distance
-            relevant_documents.append({"content": doc, "metadata": metadata})
-
-        # so this is where we grab the response from the vectordb, and add it to a
-        # context var
-        context = "\n\n".join(
-            [f"Content:\n{doc['content']}" for doc in relevant_documents]
-        )
-
-        # got this prompt directly from IBM's internal RAG template
-        prompt = f"""<|start_of_role|>system<|end_of_role|>
-                - You are a helpful, respectful, and honest assistant that can summarize long documents.
-                - Always respond as helpfully as possible, while being safe.
-                - Your responses should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content.
-                - Please ensure that your responses are socially unbiased and positive in nature.
-                - If a document does not make any sense, or is not factually coherent, explain why instead of responding something not correct.
-                - If you don't know the response to a query, please do not share false information.
-                <|start_of_role|>user<|end_of_role|>
-                You are an assistant for question-answering tasks. Generate a conversational response for the given question based on the given set of document context. Think step by step to answer in a crisp manner. Answer should not be more than 200 words. If you do not find any relevant answer in the given documents, please state you do not have an answer. Do not try to generate any information.
-
-                Context : {context}
-                Question : {request.query}
-                Answer: <|start_of_role|>assistant<|end_of_role|>"""
-
-        response = watsonx_llm(prompt)
-
-        return {
-            "answer": response,
-            "sources": [
-                {
-                    "relevance_score": doc["metadata"]["relevance_score"],
-                    "metadata": doc["metadata"],
-                }
-                for doc in relevant_documents
-            ],
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    query: str = Field(
+        ...,
+        description=(
+            "The user's input query that will be processed through a multi-agent pipeline "
+            "to generate an intelligent answer."
+        ),
+    )
 
 
 class CategoryResponse(BaseModel):
-    category: str
+    category: str = Field(
+        ...,
+        description=(
+            "The determined category for the query. It must be one of the following values: "
+            "'technical', 'billing', or 'account', which help route the query to the correct domain."
+        ),
+    )
 
 
 class FinalResponse(BaseModel):
-    category: str
-    response: str
+    category: str = Field(
+        ...,
+        description=(
+            "The category assigned to the query by the categorization agent. "
+            "This value is one of 'technical', 'billing', or 'account'."
+        ),
+    )
+    response: str = Field(
+        ...,
+        description=(
+            "The final generated natural language answer. This response is produced after "
+            "retrieving relevant documents and processing them via a dedicated generation agent."
+        ),
+    )
 
 
 class AIQueryAnswerResponse(BaseModel):
-    response: FinalResponse
+    response: FinalResponse = Field(
+        ...,
+        description=(
+            "The final response object containing both the query category and the generated answer, "
+            "conforming to the multi-agent processing pipeline output."
+        ),
+    )
 
 
 @app.post("/agentic-route")
@@ -533,7 +364,6 @@ async def agentic_route(query: QueryRequest):
             
             User Query: "{query.query}"
             """,
-            # expected_output="Either 'technical', 'billing', or 'account'",
             expected_output="A JSON object with a 'category' field that must be either 'technical', 'billing', or 'account'",
             agent=collection_selector_agent,
             output_json=CategoryResponse,
@@ -673,10 +503,6 @@ async def agentic_route(query: QueryRequest):
         crew_result = crew.kickoff()
 
         return {"response": crew_result}
-
-        # return FinalResponse(
-        #     category=crew_result["category"], response=crew_result["response"]
-        # )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
