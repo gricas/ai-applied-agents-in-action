@@ -1,5 +1,11 @@
 //******************* An example MySQL config *******************//
 
+// We can also create a s3 bucket to store the docs that are uploaded to the vectordb
+// which we could send as reference back from the API and then provide to the end user 
+// to look at the original doc as source.
+
+// will implement with fileuploader at a later date
+
 // import mysql from 'mysql2/promise';
 // import dotenv from 'dotenv'
 
