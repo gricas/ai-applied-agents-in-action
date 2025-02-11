@@ -127,7 +127,7 @@ const ChatWindow = () => {
                   {msg.sender === 'agent' && msg.category && (
                     <span className='chat-window__category'>
                       {' '}
-                      | Category: {msg.category}
+                      [ Category: {msg.category} ]
                     </span>
                   )}
                 </span>

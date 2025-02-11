@@ -20,13 +20,14 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).send({ error: 'Query is required' });
     }
 
+    // Plain ol' RAG
     // const result = await axios.post(`${API_URL}/rag-query`, { query });
+
+    // AGENTS!!
     const result = await axios.post(`${API_URL}/agentic-route`, { query });
 
     const answer = result.data.response.json_dict.response;
     const category = result.data.response.json_dict.category;
-
-    console.log(`Answer: ${answer}, Category: ${category}`)
 
     return res.status(200).send({
       answer,

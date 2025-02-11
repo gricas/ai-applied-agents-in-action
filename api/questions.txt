@@ -1,10 +1,10 @@
 ----------------------------------
 TECHNICAL QUERIES
 ----------------------------------
-"How do I reset my password?"
+NOT RELIABLE "How do I reset my password?"
 (Should retrieve instructions on the password reset process.)
 
-"What are the common login error messages and how do I fix them?"
+GOOD "What are the common login error messages and how do I fix them?"
 (Should return solutions for ERR_001 and ERR_002.)
 
 NOT RELIABLE "How can I enable two-factor authentication (2FA)?"
@@ -31,7 +31,7 @@ BILLING QUERIES
 "Do you offer refunds for annual subscriptions?"
 (Should return the refund policy, including time limits for requests.)
 
-"How do I upgrade from Free to Pro plan?"
+EHH "How do I upgrade from Free to Pro plan?"
 (Should retrieve subscription upgrade instructions.)
 
 ----------------------------------
@@ -49,7 +49,7 @@ ACCOUNT MANAGEMENT QUERIES
 "How can I enforce password security for my team?"
 (Should retrieve security settings like password complexity rules.)
 
-"Where can I find audit logs for user activity?"
+UNRELIABLE "Where can I find audit logs for user activity?"
 (Should return details on accessing logs for security and compliance.)
 
 ----------------------------------

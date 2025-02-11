@@ -124,22 +124,7 @@ async def health():
     """
     return {"message": "Fast API up!"}
 
-
-@app.post("/test_route")
-async def test_route(request: TestRequest):
-    """
-    Test route to ensure the server can receive and return data properly.
-    """
-    try:
-        data = request.data
-        return {"data": data}
-    except Exception as e:
-        logging.error(f"Error in test_route: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
-
 
 @app.post("/process-documents")
 async def process_documents(files: List[UploadFile] = File(...)):
@@ -200,10 +185,6 @@ async def process_documents(files: List[UploadFile] = File(...)):
                 embeddings = embedding_model.embed_documents(
                     texts=texts,
                     concurrency_limit=10,
-                    # params={
-                    #     EmbedTextParamsMetaNames.BATCH_SIZE: min(
-                    #         batch_size, len(batch))
-                    # }
                 )
 
                 collection.add(
@@ -417,11 +398,6 @@ class QueryRequest(BaseModel):
     query: str
 
 
-class CategoryResponse(BaseModel):
-    query: str
-    category: str
-
-
 @app.post("/rag-query")
 async def rag_query(request: QueryRequest):
     try:
@@ -521,8 +497,35 @@ class FinalResponse(BaseModel):
     response: str
 
 
+class AIQueryAnswerResponse(BaseModel):
+    response: FinalResponse
+
+
 @app.post("/agentic-route")
 async def agentic_route(query: QueryRequest):
+    """
+    Process a user query through a multi-agent pipeline to generate an intelligent answer.
+
+    This endpoint orchestrates a three-step process:
+      1. **Query Categorization**: An LLM-powered agent determines the query category from
+         a fixed set ("technical", "billing", or "account").
+      2. **Context Retrieval**: Based on the determined category, the system queries the
+         corresponding ChromaDB collection using an embedding model to extract relevant documents.
+      3. **Response Generation**: A dedicated agent generates a detailed answer using a structured
+         prompt that incorporates the query and the retrieved document context.
+
+    **Return Structure**:
+      The response is a JSON object conforming to the `AIQueryAnswerResponse` model:
+        {
+            "response": {
+                "category": <str>,  # one of "technical", "billing", or "account"
+                "response": <str>   # the generated natural language answer
+            }
+        }
+
+    **Raises**:
+      - HTTPException: If an error occurs during processing.
+    """
     try:
         apikey = os.environ.get("IBM_APIKEY")
         project_id = os.environ.get("PROJECT_ID")
@@ -665,6 +668,7 @@ async def agentic_route(query: QueryRequest):
             context=[categorization_task],
         )
 
+        # make a tool to check if the answer answers the question
         @tool("generate_response_tool")
         def generate_response_tool(context: str, query: str) -> dict:
             """Tool to generate a response using the specific prompt template"""
@@ -720,9 +724,9 @@ async def agentic_route(query: QueryRequest):
 
         return {"response": crew_result}
 
-        return FinalResponse(
-            category=crew_result["category"], response=crew_result["response"]
-        )
+        # return FinalResponse(
+        #     category=crew_result["category"], response=crew_result["response"]
+        # )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
