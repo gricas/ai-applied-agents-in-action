@@ -1,0 +1,56 @@
+----------------------------------
+TECHNICAL QUERIES
+----------------------------------
+GOOD "What are the common login error messages and how do I fix them?"
+(Should return solutions for ERR_001 and ERR_002.)
+
+GOOD "What are the API rate limits for different plans?"
+(Should return rate limits for Free, Pro, and Enterprise tiers.)
+
+GOOD "How do I authenticate API requests?"
+(Should retrieve details on generating API keys and authentication headers.)
+
+----------------------------------
+BILLING QUERIES
+----------------------------------
+GOOD "What payment methods do you accept?"
+(Should retrieve credit card, PayPal, and bank transfer details.)
+
+GOOD "How can I download my invoices?"
+(Should return steps on accessing invoices via the Billing History section.)
+
+GOOD "What happens if my payment is declined?"
+(Should retrieve troubleshooting steps for declined payments.)
+
+GOOD "Do you offer refunds for annual subscriptions?"
+(Should return the refund policy, including time limits for requests.)
+
+----------------------------------
+ACCOUNT MANAGEMENT QUERIES
+----------------------------------
+GOOD "How do I invite a new team member?"
+(Should return instructions on adding members via Settings → Team.)
+
+GOOD "What permissions does an Editor role have?"
+(Should retrieve the capabilities and restrictions of the Editor role.)
+
+GOOD "Can I change my company’s time zone setting?"
+(Should return organization settings details.)
+
+GOOD "How can I enforce password security for my team?"
+(Should retrieve security settings like password complexity rules.)
+
+----------------------------------
+GENERAL QUERIES (TESTING SEMANTIC SEARCH)
+----------------------------------
+GOOD "I can’t log in; what should I do?"
+(Should retrieve login troubleshooting steps.)
+
+GOOD "Does the Enterprise plan support custom billing cycles?"
+(Should return information about Enterprise plan custom billing.)
+
+GOOD "How do I manage API access for my team?"
+(Should retrieve details on generating and managing API keys.)
+
+GOOD "How do I downgrade my subscription?"
+(Should return details on switching plans or canceling the subscription.)

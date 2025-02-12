@@ -1,20 +1,21 @@
-$loading-dots-color: rgba(0,0,0,.8);
+$loading-dots-color: rgba(0, 0, 0, 0.8);
 
 .chat-window {
   &__grid {
     display: flex;
     justify-content: center;
+    margin-top: 5em;
   }
 
   &__column {
-    max-width: 80%;
+    max-width: 65%;
     width: 100%;
     margin: 0 auto;
   }
 
   &__tile {
-    min-height: 400px;
-    max-height: 400px;
+    min-height: 600px;
+    max-height: 600px;
     padding-inline: 1.5rem;
     padding-block: 1.5rem;
     border-radius: 8px;
@@ -48,6 +49,11 @@ $loading-dots-color: rgba(0,0,0,.8);
       background-color: #0f62fe;
       color: #fff;
     }
+  }
+  &__category {
+    text-transform: capitalize;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.9);
   }
 
   &__loading {
@@ -90,9 +96,15 @@ $loading-dots-color: rgba(0,0,0,.8);
   }
 
   @keyframes dotFade {
-    0% { opacity: 0.3; }
-    50% { opacity: 1; }
-    100% { opacity: 0.3; }
+    0% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.3;
+    }
   }
 
   &__timestamp {

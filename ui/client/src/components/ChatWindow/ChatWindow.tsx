@@ -9,12 +9,14 @@ import {
 } from '@carbon/react';
 import { Send, Reset } from '@carbon/icons-react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 
 export interface ChatMessage {
   id: string;
   sender: 'agent' | 'user';
   message: string;
   timestamp?: string;
+  category?: string;
 }
 
 const openingMessage: ChatMessage[] = [
@@ -77,6 +79,7 @@ const ChatWindow = () => {
           sender: 'agent',
           message: result.data.answer,
           timestamp: new Date().toISOString(),
+          category: result.data?.category,
         };
 
         setMessages([...updatedMessages, newAnswer]);
@@ -111,7 +114,8 @@ const ChatWindow = () => {
                     : 'chat-window__message--agent'
                 }`}
               >
-                <p>{msg.message}</p>
+                {/*<p>{msg.message}</p>*/}
+                <ReactMarkdown>{msg.message}</ReactMarkdown>
                 <span
                   className={`chat-window__timestamp ${
                     msg.sender === 'user'
@@ -120,6 +124,12 @@ const ChatWindow = () => {
                   }`}
                 >
                   {formatTimestamp(msg.timestamp)}
+                  {msg.sender === 'agent' && msg.category && (
+                    <span className='chat-window__category'>
+                      {' '}
+                      [ Category: {msg.category} ]
+                    </span>
+                  )}
                 </span>
               </div>
             ))}

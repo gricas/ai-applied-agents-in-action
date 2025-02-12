@@ -1,0 +1,114 @@
+# Billing Documentation
+
+## Subscription Plans
+
+Our platform offers three subscription tiers to cater to different needs and business sizes:
+
+### Free Tier
+- **Up to 3 users**
+- Access to **basic features**, including core functionality.
+- **5GB storage** for storing files and data.
+- **Community support** via forums and knowledge base.
+- **No credit card required** to sign up.
+- Ideal for **individual users or small teams** exploring the platform.
+
+### Pro Plan ($29/month)
+- Supports **up to 10 users** with role-based permissions.
+- Access to **advanced features**, including premium integrations and automation.
+- **50GB of cloud storage** for files and data.
+- **Priority email support** for faster assistance.
+- Choice between **monthly or annual billing** cycles.
+- Suitable for **small to mid-sized businesses** that need additional collaboration tools.
+
+### Enterprise Plan (Custom Pricing)
+- **Unlimited users** with configurable permissions and admin roles.
+- **All features included**, including API access, custom branding, and analytics.
+- **Custom storage options** to fit large-scale data needs.
+- **24/7 priority support** with a dedicated account manager.
+- **Custom contract terms** to align with enterprise requirements.
+- Designed for **large organizations and enterprises** requiring maximum flexibility.
+
+---
+
+## Payment Processing
+
+### Accepted Payment Methods
+To provide flexibility, we support multiple payment methods:
+- **Major credit cards** (Visa, MasterCard, American Express, Discover)
+- **PayPal** for added convenience and security.
+- **Bank transfer** (Enterprise customers only, upon request).
+- **Invoicing available** for annual plans and Enterprise customers.
+- **Auto-renewal** is enabled by default, ensuring uninterrupted service.
+
+### Billing Cycles
+Our billing structure is designed for flexibility:
+- **Monthly Billing:** Charges occur on the **signup date** and repeat on the same day each month.
+- **Annual Billing:** Customers receive a **20% discount** when billed yearly.
+- **Enterprise Billing:** Custom billing cycles based on contract agreements.
+- **Grace Period:** In case of failed payments, a **7-day grace period** is provided before account suspension.
+
+### Managing Payment Methods
+- Navigate to **Settings → Billing** to update payment details.
+- Add, remove, or modify payment methods securely.
+- Enable **backup payment methods** to prevent service interruptions.
+
+---
+
+## Common Billing Issues & Solutions
+
+### Problem: Payment Declined
+If your payment is declined, follow these steps:
+1. Verify that **card details** (number, expiration date, CVV) are correct.
+2. Ensure that your **account has sufficient funds**.
+3. Confirm that your **billing address** matches the details on your card.
+4. Check if your **bank has blocked the transaction** due to security concerns.
+5. If the issue persists, contact your **bank or payment provider** and try again.
+
+### Problem: Missing Invoice
+If you cannot find your invoice:
+1. Access all past invoices in **Billing → History** within your account dashboard.
+2. Download a PDF copy of any invoice for record-keeping.
+3. Request an invoice copy by emailing **finance@example.com**.
+4. Ensure to **include your account ID** in your correspondence for faster processing.
+
+### Problem: Subscription Downgrade or Cancellation
+1. Navigate to **Settings → Billing**.
+2. Select **“Manage Subscription”**.
+3. Choose **Downgrade to Free Plan** or **Cancel Subscription**.
+4. Follow the confirmation steps.
+5. Any **remaining balance** will be credited or refunded based on our refund policy.
+6. **Enterprise plans require manual cancellation** by contacting support.
+
+### Problem: Overcharge or Incorrect Charge
+If you notice an incorrect charge:
+1. Review your **billing history** in the account dashboard.
+2. Check for **additional users, overages, or feature upgrades** that may have caused the charge.
+3. Contact **billing support (billing@example.com)** for a detailed breakdown.
+4. Refunds, if applicable, are processed within **5-7 business days**.
+
+---
+
+## Refund Policy
+- **Monthly Plans:** Refund requests must be made within **3 days** of billing.
+- **Annual Plans:** Refund requests must be made within **14 days** of initial payment.
+- **Pro-rated refunds** are offered for accidental charges or service failures.
+- **No refunds** are available for partially used billing cycles.
+- Enterprise customers must refer to their **custom contract terms**.
+
+---
+
+## Tax & Compliance
+- **Sales tax, VAT, and other applicable taxes** may be added based on your region.
+- Tax invoices are automatically generated and can be downloaded in **Billing → History**.
+- For **tax-exempt status**, submit the required documents to **finance@example.com**.
+
+---
+
+## Support and Assistance
+For any billing-related issues, reach out to our **billing support team**:
+- **Support Email:** `billing@example.com`
+- **Phone Support:** Available for **Pro and Enterprise users**.
+- **Live Chat:** Available during business hours in the **Help Center**.
+
+For further assistance, visit our **Billing Help Center** for FAQs, guides, and policy details.
+
