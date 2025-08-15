@@ -35,7 +35,8 @@ io.on('connect', (socket: Socket) => {
 // appended all routes with api/
 app.use(routes);
 
-app.get('/', (_req: Request, res: Response) => {
+// Test endpoint moved to /health
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ message: 'backend working' });
 });
 

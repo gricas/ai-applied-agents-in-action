@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-applied-demo-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-applied-demo-api
+  template:
+    metadata:
+      labels:
+        app: ai-applied-demo-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 2000
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+      restartPolicy: Always
+      containers:
+      - name: ai-applied-demo-api
+        image: grick8s/ai-applied-demo-api:latest
+        imagePullPolicy: Always
+        envFrom:
+          - configMapRef:
+              name: ai-applied-demo-api-configmap
+          - secretRef:
+              name: watsonxai
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
