@@ -9,7 +9,3 @@ configMapGenerator:
   - name: ai-applied-demo-fastapi-configmap
     literals:
       - API_PROXY=http://ai-applied-demo-fastapi-service:8000
-
-
-
-
