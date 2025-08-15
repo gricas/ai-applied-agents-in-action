@@ -2,12 +2,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ai-applied-demo-fastapi-service
+  name: ai-applied-demo-api-service
   labels:
-    app: ai-applied-demo-fastapi
+    app: ai-applied-demo-api
 spec:
   type: ClusterIP
   ports:
     - port: 8000
   selector:
-    app: ai-applied-demo-fastapi
+    app: ai-applied-demo-api

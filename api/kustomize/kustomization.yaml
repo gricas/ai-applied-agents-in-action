@@ -6,6 +6,9 @@ resources:
   - service.yaml
 
 configMapGenerator:
-  - name: ai-applied-demo-fastapi-configmap
+  - name: ai-applied-demo-api-configmap
     literals:
-      - API_PROXY=http://ai-applied-demo-fastapi-service:8000
+      - API_PROXY=http://ai-applied-demo-api-service:8000
+
+generatorOptions:
+  disableNameSuffixHash: true
