@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-applied-demo-fastapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-applied-demo-fastapi
+  template:
+    metadata:
+      labels:
+        app: ai-applied-demo-fastapi
+    spec:
+      containers:
+      - name: ai-applied-demo-fastapi
+        image: grick8s/ai-applied/ai-applied-demo-fastapi:latest
+        imagePullPolicy: IfNotPresent
+        envFrom:
+          - configMapRef:
+              name: ai-applied-demo-fastapi-configmap
+          - secretRef:
+              name: ai-applied-demo
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+      restartPolicy: Always

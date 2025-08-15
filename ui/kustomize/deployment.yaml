@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-applied-demo-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-applied-demo-ui
+  template:
+    metadata:
+      labels:
+        app: ai-applied-demo-ui
+    spec:
+      containers:
+      - name: ai-applied-demo-ui
+        image: grick8s/ai-applied-demo-ui:latest
+        imagePullPolicy: Always
+        envFrom:
+          - configMapRef:
+              name: ai-applied-demo-ui-configmap
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+      restartPolicy: Always

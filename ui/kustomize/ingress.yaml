@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-applied-demo-ui-ingress
+  namespace: ai-applied-demo
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  tls:
+  - hosts:
+    - ai-applied-demo-ui.gricascloud.com
+    secretName: ai-applied-demo-ui.gricascloud.com-tls-prod
+  ingressClassName: nginx
+  rules:
+  - host: ai-applied-demo-ui.gricascloud.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-applied-demo-ui-service
+            port:
+              number: 8080

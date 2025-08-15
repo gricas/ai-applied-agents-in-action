@@ -29,3 +29,20 @@ Dockerfile
 # Ignore any OS-specific files
 .DS_Store
 Thumbs.db
+
+# Exclude development and test files
+tests/
+.pytest_cache/
+.coverage
+questions.txt
+requirements.inprogress
+
+# Exclude ChromaDB data (will be recreated)
+chroma_db/
+
+# Exclude documentation
+README.md
+*.md
+
+# Exclude Kubernetes configs
+kustomize/
